@@ -46,6 +46,8 @@ def build_tokenizer(args, **kwargs):
         tokenizer = _GPTSentencePieceTokenizer(args.tokenizer_model)
     elif args.tokenizer_type == 'HuggingFaceTokenizer':
         tokenizer = _HuggingFaceTokenizer(args.tokenizer_model, **kwargs)
+    elif args.tokenizer_type == 'HuggingFacePretrainedTokenizer':
+        tokenizer = _HuggingFacePretrainedTokenizer(args.tokenizer_model, **kwargs)
     elif args.tokenizer_type == 'Llama2Tokenizer':
         assert args.tokenizer_model is not None
         tokenizer = _Llama2Tokenizer(args.tokenizer_model)
@@ -89,6 +91,56 @@ def _vocab_size_with_padding(orig_vocab_size, args, logging_enabled=True):
               '(new size: {})'.format(
                   orig_vocab_size, after - orig_vocab_size, after), flush=True)
     return after
+
+
+class _HuggingFacePretrainedTokenizer(MegatronTokenizer):
+    def __init__(self, pretrained_model_name_path: str, **kwargs):
+        super().__init__(pretrained_model_name_path, **kwargs)
+        try:
+            import tokenizers
+        except ImportError:
+            raise EnvironmentError(f"The tokenizers library must be installed to use huggingface_tokenizer_provider")
+        self._tokenizer = tokenizers.Tokenizer.from_file(pretrained_model_name_path)
+        self._vocab = self._tokenizer.get_vocab()
+        self._inv_vocab = {token_id: token for token, token_id in self._vocab.items()}
+        
+    @property
+    def vocab_size(self):
+        return self._tokenizer.get_vocab_size()
+    
+    @property
+    def vocab(self):
+        return self._vocab
+    
+    @property
+    def inv_vocab(self):
+        return self._inv_vocab
+    
+    @property
+    def decoder(self):
+        return self._inv_vocab
+    
+    def tokenize(self, text, **kwargs):
+        return self._tokenizer.encode(text).ids
+    
+    def detokenize(self, token_ids, **kwargs):
+        return self._tokenizer.decode(token_ids)
+    
+    @property
+    def eod(self):
+        return self._tokenizer.token_to_id("[SEP]")
+    
+    @property
+    def pad(self):
+        return self._tokenizer.token_to_id("[PAD]")
+    
+    @property
+    def mask(self):
+        return self._tokenizer.token_to_id("[MASK]")
+    
+    @property
+    def sep(self):
+        return self._tokenizer.token_to_id("[SEP]")
 
 
 class _HuggingFaceTokenizer(MegatronTokenizer):

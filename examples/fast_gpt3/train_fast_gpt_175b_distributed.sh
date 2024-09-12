@@ -29,7 +29,7 @@ GPT_MODEL_ARGS=(
     --hidden-size 2048 
     --num-attention-heads 8 
     --seq-length 4096 
-    --max-position-embeddings 4096
+    --max-position-embeddings 4096 
 )
 
 TRAINING_ARGS=(
@@ -43,22 +43,23 @@ TRAINING_ARGS=(
     --init-method-std 0.006 
     --clip-grad 1.0 
     --fp16
-    --lr 1.0e-4 
+    --lr 6.0e-5 
     --lr-decay-style cosine 
-    --min-lr 1.0e-5
+    --min-lr 6.0e-6
     --lr-warmup-fraction .001 
     --lr-decay-iters 430000 
 )
 
 MODEL_PARALLEL_ARGS=(
-	--tensor-model-parallel-size 4
-	--pipeline-model-parallel-size 0
+	--tensor-model-parallel-size 4 
+	--pipeline-model-parallel-size 0 
 )
 
 DATA_ARGS=(
     --data-path $DATA_PATH 
     --tokenizer-type HuggingFacePretrainedTokenizer
-    --tokenizer-model $VOCAB_FILE
+    --vocab-file $VOCAB_FILE 
+    --merge-file $MERGE_FILE 
     --split 975,24,1
 )
 
@@ -72,7 +73,7 @@ EVAL_AND_LOGGING_ARGS=(
     --tensorboard-dir $TENSORBOARD_LOGS_PATH 
 )
 
-torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \
+torchrun ${DISTRIBUTED_ARGS[@]} pretrain_fastgpt.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

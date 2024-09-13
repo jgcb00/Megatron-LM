@@ -30,13 +30,17 @@ GPT_MODEL_ARGS=(
     --num-attention-heads 8 
     --seq-length 4096 
     --max-position-embeddings 4096
+    --seed 42
 )
 
 TRAINING_ARGS=(
-    --micro-batch-size 1 
-    --global-batch-size 245 
+    --num-workers 0 
+    #--no-mmap-bin-files
+    --micro-batch-size 20 
+    --global-batch-size 250 
     --rampup-batch-size 20 2 250000 
-    --train-iters 500000 
+    #--dataloader-type single
+    --train-samples 10000000 
     --weight-decay 0.1 
     --adam-beta1 0.9 
     --adam-beta2 0.95 
@@ -47,12 +51,12 @@ TRAINING_ARGS=(
     --lr-decay-style cosine 
     --min-lr 1.0e-5
     --lr-warmup-fraction .001 
-    --lr-decay-iters 430000 
+    #--lr-decay-iters 430000 
 )
 
 MODEL_PARALLEL_ARGS=(
 	--tensor-model-parallel-size 4
-	--pipeline-model-parallel-size 0
+	--pipeline-model-parallel-size 1
 )
 
 DATA_ARGS=(
@@ -60,6 +64,7 @@ DATA_ARGS=(
     --tokenizer-type HuggingFacePretrainedTokenizer
     --tokenizer-model $VOCAB_FILE
     --split 975,24,1
+    --vocab-size 50304
 )
 
 EVAL_AND_LOGGING_ARGS=(
@@ -72,7 +77,7 @@ EVAL_AND_LOGGING_ARGS=(
     --tensorboard-dir $TENSORBOARD_LOGS_PATH 
 )
 
-torchrun ${DISTRIBUTED_ARGS[@]} pretrain_gpt.py \
+torchrun ${DISTRIBUTED_ARGS[@]} ../../Megatron-LM/pretrain_gpt.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

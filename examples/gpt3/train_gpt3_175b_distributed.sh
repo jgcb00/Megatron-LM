@@ -10,10 +10,11 @@ GPUS_PER_NODE=4
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 #MASTER_ADDR="localhost"
 MASTER_PORT=48994
-NUM_NODES=4
+NUM_NODES=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | wc -l)
 NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NUM_NODES))
 echo "Master Address : "$MASTER_ADDR
+echo $NUM_NODES" Nodes"
 CHECKPOINT_PATH=$1 #<Specify path>
 TENSORBOARD_LOGS_PATH=$2 #<Specify path>
 VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
@@ -40,13 +41,13 @@ GPT_MODEL_ARGS=(
 )
 
 TRAINING_ARGS=(
-    --num-workers 8 
+    --num-workers 16
     #--no-mmap-bin-files
-    --micro-batch-size 60 
+    --micro-batch-size 6
     #--global-batch-size 240 
     #--rampup-batch-size 20 10 250000 
     #--dataloader-type single
-    --train-samples 10000000 
+    --train-samples 12207050 
     --weight-decay 0.1 
     --adam-beta1 0.9 
     --adam-beta2 0.95 
@@ -59,11 +60,12 @@ TRAINING_ARGS=(
     --lr-warmup-fraction .001 
     #--lr-decay-iters 430000 
     --use-flash-attn
+    #--use-distributed-optimizer
 )
 
 MODEL_PARALLEL_ARGS=(
-	--tensor-model-parallel-size 4
-	--pipeline-model-parallel-size 2
+	--tensor-model-parallel-size 1
+	--pipeline-model-parallel-size 1
 )
 
 DATA_ARGS=(

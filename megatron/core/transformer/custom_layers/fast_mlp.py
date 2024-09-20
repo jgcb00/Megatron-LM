@@ -64,7 +64,7 @@ class FastMLP(MegatronModule):
 
         self.input_size = input_size if input_size != None else self.config.hidden_size
 
-        depth = ceil(log2(self.config.ffn_hidden_size/submodules.parallel_trees))
+        depth = int(ceil(log2(self.config.ffn_hidden_size/submodules.parallel_trees)))
         
         print(f"Depth: {depth}")
         if submodules.master_node and submodules.master_node_width is None:
@@ -81,11 +81,11 @@ class FastMLP(MegatronModule):
         # if self.config.gated_linear_unit:
         #     ffn_hidden_size *= 2
         # We divide by four as each gpu will activate a part of the hiddensize
-        self.master_node_width = submodules.master_node_width / tensor_model_parallel_size
+        self.master_node_width = int(submodules.master_node_width / tensor_model_parallel_size)
         print(f"Master Node Width: {self.master_node_width}")
         self.parallel_trees = submodules.parallel_trees
         print(f"Parallel Trees: {self.parallel_trees}")
-        self.parallel_trees_by_gpu = submodules.parallel_trees / tensor_model_parallel_size
+        self.parallel_trees_by_gpu = int(submodules.parallel_trees / tensor_model_parallel_size)
         self.depth = depth
 
         self.linear_fc1 = build_module(

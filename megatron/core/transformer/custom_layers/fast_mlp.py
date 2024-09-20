@@ -74,7 +74,7 @@ class FastMLP(MegatronModule):
             submodules.master_node_width = 0
         
         #The fused kernel multiplies the hidden size by 4, so we need to divide by 4
-        ffn_hidden_size = int(((2**depth - 1) * submodules.parallel_trees + submodules.master_node_width) / 4)
+        ffn_hidden_size = int((2**depth - 1) * submodules.parallel_trees + submodules.master_node_width)
         print(f"FFN Hidden Size: {ffn_hidden_size}")
         
         # if self.config.gated_linear_unit:

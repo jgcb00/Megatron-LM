@@ -21,7 +21,7 @@ from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import make_sharded_tensors_for_checkpoint
-
+from megatron.training import get_args
 
 @dataclass
 class FastMLPSubmodules:
@@ -57,17 +57,18 @@ class FastMLP(MegatronModule):
         input_size: int = None,
     ):
         super().__init__(config=config)
-
+        args = get_args()
+        tensor_model_parallel_size = args.tensor_model_parallel_size
+        assert submodules.parallel_trees % tensor_model_parallel_size == 0, "FFFN Tree can't be divided between gpu"
         self.config: TransformerConfig = config
 
         self.input_size = input_size if input_size != None else self.config.hidden_size
 
-        # If this is a gated linear unit we double the output width, see https://arxiv.org/pdf/2002.05202.pdf
-        ffn_hidden_size = self.config.ffn_hidden_size
         depth = ceil(log2(self.config.ffn_hidden_size/submodules.parallel_trees))
         if submodules.master_node and submodules.master_node_width is None:
             #it has to be a multiple of 8, to avoid issue with tensor model parallelism
-            submodules.master_node_width = ceil(depth /8) * 8 
+            submodules.master_node_width = ceil(depth /8) * 8
+            assert submodules.master_node_width % tensor_model_parallel_size == 0, "Master node width can't be divided between gpu"
         elif submodules.master_node_width is None:
             submodules.master_node_width = 0
         
@@ -78,8 +79,9 @@ class FastMLP(MegatronModule):
         # if self.config.gated_linear_unit:
         #     ffn_hidden_size *= 2
         # We divide by four as each gpu will activate a part of the hiddensize
-        self.master_node_width = submodules.master_node_width / 4
+        self.master_node_width = submodules.master_node_width / tensor_model_parallel_size
         self.parallel_trees = submodules.parallel_trees
+        self.parallel_trees_by_gpu = submodules.parallel_trees / tensor_model_parallel_size
         self.depth = depth
 
         self.linear_fc1 = build_module(
@@ -99,8 +101,8 @@ class FastMLP(MegatronModule):
 
         self.linear_fc2 = build_module(
             submodules.linear_fc2,
-            self.config.ffn_hidden_size,
-            self.config.hidden_size,
+            ffn_hidden_size,
+            self.input_size,
             config=self.config,
             init_method=self.config.output_layer_init_method,
             bias=False, #self.config.add_bias_linear,
@@ -121,7 +123,7 @@ class FastMLP(MegatronModule):
             intermediate_parallel, 
             bias_parallel, 
             self.master_node_width, 
-            self.parallel_trees, 
+            self.parallel_trees_by_gpu, 
             self.depth,
         )
         

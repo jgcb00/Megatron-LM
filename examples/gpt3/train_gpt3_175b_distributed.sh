@@ -3,23 +3,19 @@
 # Runs the "175B" parameter model
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-export MEGATRON_LOGGING_LEVEL=10
 
 GPUS_PER_NODE=4
-# Change for multinode config
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-#MASTER_ADDR="localhost"
 MASTER_PORT=48994
 NUM_NODES=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | wc -l)
-NODE_RANK=0
 WORLD_SIZE=$(($GPUS_PER_NODE*$NUM_NODES))
-echo "Master Address : "$MASTER_ADDR
-echo $NUM_NODES" Nodes"
+echo "Master Address : "$MASTER_ADDR" | "$NUM_NODES" Nodes | World Size : "$WORLD_SIZE
+
 CHECKPOINT_PATH=$1 #<Specify path>
 TENSORBOARD_LOGS_PATH=$2 #<Specify path>
 VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
 DATA_PATH=$4 #<Specify path and file prefix>_text_document
-#MASTER_NODE_IP=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address)
+
 DISTRIBUTED_ARGS=(
     --nproc_per_node $GPUS_PER_NODE 
     --nnodes $NUM_NODES 
@@ -37,16 +33,11 @@ GPT_MODEL_ARGS=(
     --seq-length 4096 
     --max-position-embeddings 4096
     --seed 42
-    --log-throughput
 )
 
 TRAINING_ARGS=(
     --num-workers 16
-    #--no-mmap-bin-files
     --micro-batch-size 7
-    #--global-batch-size 240 
-    #--rampup-batch-size 20 10 250000 
-    #--dataloader-type single
     --train-samples 12207050 
     --weight-decay 0.1 
     --adam-beta1 0.9 
@@ -61,12 +52,6 @@ TRAINING_ARGS=(
     #--lr-decay-iters 430000 
     --use-flash-attn
     #--use-distributed-optimizer
-    #--no-save-optim
-    --ckpt-format torch
-    --log-validation-ppl-to-tensorboard
-    --log-memory-to-tensorboard
-    --log-world-size-to-tensorboard
-    
 )
 
 MODEL_PARALLEL_ARGS=(
@@ -89,7 +74,12 @@ EVAL_AND_LOGGING_ARGS=(
     --save $CHECKPOINT_PATH 
     --load $CHECKPOINT_PATH 
     --eval-iters 10
-    --tensorboard-dir $TENSORBOARD_LOGS_PATH 
+    --tensorboard-dir $TENSORBOARD_LOGS_PATH
+    --ckpt-format torch
+    --log-validation-ppl-to-tensorboard
+    --log-memory-to-tensorboard
+    --log-world-size-to-tensorboard
+    --log-throughput
 )
 
 srun torchrun ${DISTRIBUTED_ARGS[@]} ../../Megatron-LM/pretrain_gpt.py \

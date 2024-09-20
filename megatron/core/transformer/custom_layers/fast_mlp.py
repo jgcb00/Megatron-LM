@@ -64,6 +64,7 @@ class FastMLP(MegatronModule):
 
         self.input_size = input_size if input_size != None else self.config.hidden_size
         print("Base config hidden size: ", self.config.hidden_size)
+        print("Before log : ", self.config.ffn_hidden_size*4/submodules.parallel_trees)
         depth = int(ceil(log2(self.config.ffn_hidden_size*4/submodules.parallel_trees)))
         
         print(f"Depth: {depth}")
@@ -146,8 +147,8 @@ class FastMLP(MegatronModule):
         return sharded_state_dict
 
 def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
-    logit_decisions = (intermediate_parallel[:, :, master_node_width+1:] > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
-    logit_decisions = logit_decisions.view(-1, parallel_trees, 2**(depth+1)-1) # (batch_size, parallel_size, n_nodes)
+    logit_decisions = (intermediate_parallel[:, :, master_node_width:] > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
+    logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1) # (batch_size, parallel_size, n_nodes)
     intermediate_parallel = bias_geglu_impl(intermediate_parallel, bias_parallel)
 
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))

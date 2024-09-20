@@ -64,24 +64,24 @@ class FastMLP(MegatronModule):
 
         self.input_size = input_size if input_size != None else self.config.hidden_size
 
-        depth = int(ceil(log2(self.config.ffn_hidden_size/submodules.parallel_trees)))
+        depth = int(ceil(log2(self.config.ffn_hidden_size*4/submodules.parallel_trees)))
         
         print(f"Depth: {depth}")
         if submodules.master_node and submodules.master_node_width is None:
-            #it has to be a multiple of 8, to avoid issue with tensor model parallelism
-            submodules.master_node_width = ceil(depth /8) * 8
-            assert submodules.master_node_width % tensor_model_parallel_size == 0, "Master node width can't be divided between gpu"
+            #it has to be a multiple of tensor_model_parallel_size, to avoid issue with tensor model parallelism
+            submodules.master_node_width = ceil(depth / tensor_model_parallel_size) * tensor_model_parallel_size
         elif submodules.master_node_width is None:
             submodules.master_node_width = 0
         
         #The fused kernel multiplies the hidden size by 4, so we need to divide by 4
-        ffn_hidden_size = int((2**depth * submodules.parallel_trees + submodules.master_node_width) / 4)
+        ffn_hidden_size = int(((2**depth - 1) * submodules.parallel_trees + submodules.master_node_width) / 4)
         print(f"FFN Hidden Size: {ffn_hidden_size}")
         
         # if self.config.gated_linear_unit:
         #     ffn_hidden_size *= 2
         # We divide by four as each gpu will activate a part of the hiddensize
-        self.master_node_width = int(submodules.master_node_width / tensor_model_parallel_size)
+        self.master_node_width = int(submodules.master_node_width) 
+        self.master_node_width_by_gpu = int(submodules.master_node_width / tensor_model_parallel_size)
         print(f"Master Node Width: {self.master_node_width}")
         self.parallel_trees = submodules.parallel_trees
         print(f"Parallel Trees: {self.parallel_trees}")
@@ -126,7 +126,7 @@ class FastMLP(MegatronModule):
         intermediate_parallel = apply_custom_fff_activation(
             intermediate_parallel, 
             bias_parallel, 
-            self.master_node_width, 
+            self.master_node_width_by_gpu, 
             self.parallel_trees_by_gpu, 
             self.depth,
         )
@@ -146,7 +146,7 @@ class FastMLP(MegatronModule):
         return sharded_state_dict
 
 def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
-    logit_decisions = (intermediate_parallel[:, :, master_node_width:] > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
+    logit_decisions = (intermediate_parallel[:, :, master_node_width+1:] > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**(depth+1)-1) # (batch_size, parallel_size, n_nodes)
     intermediate_parallel = bias_geglu_impl(intermediate_parallel, bias_parallel)
 

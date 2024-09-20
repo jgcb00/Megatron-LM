@@ -63,7 +63,7 @@ class FastMLP(MegatronModule):
         self.config: TransformerConfig = config
 
         self.input_size = input_size if input_size != None else self.config.hidden_size
-
+        print("Base config hidden size: ", self.config.hidden_size)
         depth = int(ceil(log2(self.config.ffn_hidden_size*4/submodules.parallel_trees)))
         
         print(f"Depth: {depth}")

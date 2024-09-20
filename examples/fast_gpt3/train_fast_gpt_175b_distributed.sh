@@ -82,7 +82,7 @@ EVAL_AND_LOGGING_ARGS=(
     --log-throughput
 )
 
-torchrun ${DISTRIBUTED_ARGS[@]} pretrain_fastgpt.py \
+torchrun ${DISTRIBUTED_ARGS[@]} ../../Megatron-LM/pretrain_fastgpt.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

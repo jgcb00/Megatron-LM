@@ -90,8 +90,8 @@ class FastMLP(MegatronModule):
 
         self.linear_fc1 = build_module(
             submodules.linear_fc1,
-            self.input_size,
-            ffn_hidden_size,
+            int(self.input_size),
+            int(ffn_hidden_size),
             config=self.config,
             init_method=self.config.init_method, #will probably have to update this
             gather_output=False,

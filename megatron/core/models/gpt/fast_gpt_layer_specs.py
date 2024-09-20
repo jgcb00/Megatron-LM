@@ -43,7 +43,7 @@ except ImportError:
     LNImpl = WrappedTorchLayerNorm
 
 
-def get_gpt_layer_with_transformer_engine_spec(
+def get_fast_gpt_layer_with_transformer_engine_spec(
     num_experts: Optional[int] = None,
     moe_grouped_gemm: Optional[bool] = False,
     qk_layernorm: Optional[bool] = False,
@@ -59,7 +59,7 @@ def get_gpt_layer_with_transformer_engine_spec(
     Returns:
         ModuleSpec: Module specification with TE modules
     """
-    mlp = _get_mlp_module_spec(
+    mlp = _get_fast_mlp_module_spec(
         use_te=True, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm
     )
     return ModuleSpec(
@@ -86,7 +86,7 @@ def get_gpt_layer_with_transformer_engine_spec(
     )
 
 
-def get_gpt_layer_local_spec(
+def get_fast_gpt_layer_local_spec(
     num_experts: Optional[int] = None,
     moe_grouped_gemm: Optional[bool] = False,
     qk_layernorm: Optional[bool] = False,
@@ -102,7 +102,7 @@ def get_gpt_layer_local_spec(
     Returns:
         ModuleSpec: Module specification with Megatron-Core modules
     """
-    mlp = _get_mlp_module_spec(
+    mlp = _get_fast_mlp_module_spec(
         use_te=False, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm
     )
     return ModuleSpec(
@@ -132,7 +132,7 @@ def get_gpt_layer_local_spec(
     )
 
 
-def _get_mlp_module_spec(
+def _get_fast_mlp_module_spec(
     use_te: Optional[bool] = True,
     num_experts: Optional[int] = None,
     moe_grouped_gemm: Optional[bool] = False,

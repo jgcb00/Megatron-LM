@@ -17,7 +17,7 @@ from megatron.core.datasets.utils import get_blend_from_list
 from megatron.core.datasets.gpt_dataset import GPTDatasetConfig
 from megatron.core.datasets.gpt_dataset import MockGPTDataset, GPTDataset
 import megatron.legacy.model
-from megatron.core.models.gpt import GPTModel
+from megatron.core.models.gpt import FastGPTModel
 from megatron.training import pretrain
 from megatron.core.utils import StragglerDetector
 from megatron.core.transformer.spec_utils import import_module
@@ -27,15 +27,15 @@ from megatron.training.utils import (
 )
 from megatron.training.arguments import core_transformer_config_from_args
 from megatron.training.yaml_arguments import core_transformer_config_from_yaml
-from megatron.core.models.gpt.gpt_layer_specs import (
-    get_gpt_layer_local_spec,
-    get_gpt_layer_with_transformer_engine_spec,
+from megatron.core.models.gpt.fast_gpt_layer_specs import (
+    get_fast_gpt_layer_local_spec,
+    get_fast_gpt_layer_with_transformer_engine_spec,
 )
 
 
 stimer = StragglerDetector()
 
-def model_provider(pre_process=True, post_process=True) -> Union[GPTModel, megatron.legacy.model.GPTModel]:
+def model_provider(pre_process=True, post_process=True) -> Union[FastGPTModel, megatron.legacy.model.GPTModel]:
     """Builds the model.
 
     If you set the use_legacy_models to True, it will return the legacy GPT model and if not the mcore GPT model.
@@ -71,11 +71,11 @@ def model_provider(pre_process=True, post_process=True) -> Union[GPTModel, megat
             transformer_layer_spec = import_module(args.spec)
         else:
             if use_te:
-                transformer_layer_spec = get_gpt_layer_with_transformer_engine_spec(args.num_experts, args.moe_grouped_gemm, args.qk_layernorm)
+                transformer_layer_spec = get_fast_gpt_layer_with_transformer_engine_spec(args.num_experts, args.moe_grouped_gemm, args.qk_layernorm)
             else:
-                transformer_layer_spec = get_gpt_layer_local_spec(args.num_experts, args.moe_grouped_gemm, args.qk_layernorm)
+                transformer_layer_spec = get_fast_gpt_layer_local_spec(args.num_experts, args.moe_grouped_gemm, args.qk_layernorm)
 
-        model = GPTModel(
+        model = FastGPTModel(
             config=config,
             transformer_layer_spec=transformer_layer_spec,
             vocab_size=args.padded_vocab_size,
@@ -152,7 +152,7 @@ def loss_func(loss_mask: torch.Tensor, output_tensor: torch.Tensor):
     )
 
 
-def forward_step(data_iterator, model: GPTModel):
+def forward_step(data_iterator, model: FastGPTModel):
     """Forward training step.
 
     Args:

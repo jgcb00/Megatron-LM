@@ -65,6 +65,7 @@ class FastMLP(MegatronModule):
         self.input_size = input_size if input_size != None else self.config.hidden_size
 
         depth = ceil(log2(self.config.ffn_hidden_size/submodules.parallel_trees))
+        
         print(f"Depth: {depth}")
         if submodules.master_node and submodules.master_node_width is None:
             #it has to be a multiple of 8, to avoid issue with tensor model parallelism
@@ -74,7 +75,7 @@ class FastMLP(MegatronModule):
             submodules.master_node_width = 0
         
         #The fused kernel multiplies the hidden size by 4, so we need to divide by 4
-        ffn_hidden_size = (depth**2 * submodules.parallel_trees + submodules.master_node_width) / 4
+        ffn_hidden_size = (2**depth * submodules.parallel_trees + submodules.master_node_width) / 4
         print(f"FFN Hidden Size: {ffn_hidden_size}")
         
         # if self.config.gated_linear_unit:

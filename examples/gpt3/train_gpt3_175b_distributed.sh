@@ -43,7 +43,7 @@ GPT_MODEL_ARGS=(
 TRAINING_ARGS=(
     --num-workers 16
     #--no-mmap-bin-files
-    --micro-batch-size 6
+    --micro-batch-size 7
     #--global-batch-size 240 
     #--rampup-batch-size 20 10 250000 
     #--dataloader-type single
@@ -61,6 +61,12 @@ TRAINING_ARGS=(
     #--lr-decay-iters 430000 
     --use-flash-attn
     #--use-distributed-optimizer
+    #--no-save-optim
+    --ckpt-format torch
+    --log-validation-ppl-to-tensorboard
+    --log-memory-to-tensorboard
+    --log-world-size-to-tensorboard
+    
 )
 
 MODEL_PARALLEL_ARGS=(

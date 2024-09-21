@@ -146,11 +146,12 @@ class FastMLP(MegatronModule):
         return sharded_state_dict
 
 def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
-    logit_decisions = (intermediate_parallel[:, :, master_node_width:] > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
+    
+    flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
+    
+    logit_decisions = (flatten_intermediate[:, master_node_width:] > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1) # (batch_size, parallel_size, n_nodes)
     intermediate_parallel = bias_geglu_impl(intermediate_parallel, bias_parallel)
-
-    flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
     
     batch_size = flatten_intermediate.size(0)
 

@@ -176,5 +176,6 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
         print("decision_map device:", decision_map.device)
         decision_map = decision_map.flatten(1,2)
         decision_map = torch.cat((ones_to_concat, decision_map), dim=-1)
+    print("Intermediate Parallel shape:", intermediate_parallel.shape)
     intermediate_parallel =  intermediate_parallel * decision_map
     return intermediate_parallel.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)

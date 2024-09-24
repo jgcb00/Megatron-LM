@@ -149,8 +149,8 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
     
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
     
-    logit_decisions = (flatten_intermediate[:, master_node_width:] > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
-    logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1) # (batch_size, parallel_size, n_nodes)
+    logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
+    logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
     intermediate_parallel = bias_geglu_impl(intermediate_parallel, bias_parallel)
     
     batch_size = flatten_intermediate.size(0)
@@ -168,14 +168,8 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
-        ones_to_concat = torch.ones((batch_size, master_node_width), device=intermediate_parallel.device)
-        print("ones_to_concat shape:", ones_to_concat.shape)
-        print("decision_map shape before flatten:", decision_map.shape)
-        print("decision_map shape after flatten:", decision_map.flatten(1,2).shape)
-        print("ones_to_concat device:", ones_to_concat.device)
-        print("decision_map device:", decision_map.device)
+        decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
-        decision_map = torch.cat((ones_to_concat, decision_map), dim=-1)
     print("Intermediate Parallel shape:", intermediate_parallel.shape)
     intermediate_parallel =  intermediate_parallel * decision_map
     return intermediate_parallel.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)

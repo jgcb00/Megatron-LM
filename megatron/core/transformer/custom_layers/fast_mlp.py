@@ -69,7 +69,7 @@ class FastMLP(MegatronModule):
         print(f"Depth: {depth}")
         if submodules.master_node and submodules.master_node_width is None:
             #it has to be a multiple of tensor_model_parallel_size, to avoid issue with tensor model parallelism
-            submodules.master_node_width = ceil(depth / tensor_model_parallel_size) * tensor_model_parallel_size
+            submodules.master_node_width = ceil(depth / submodules.parallel_trees) * submodules.parallel_trees
         elif submodules.master_node_width is None:
             submodules.master_node_width = 0
         

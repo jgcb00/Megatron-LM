@@ -12,13 +12,11 @@ from megatron.core.dist_checkpointing import ShardedTensor
 from megatron.core.dist_checkpointing.mapping import (
     ReplicaId,
     ShardedStateDict,
-    ShardedTensorFactory,
 )
 from megatron.core.fusions.fused_bias_gelu import bias_gelu_impl
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
-from megatron.core.transformer.utils import make_sharded_tensors_for_checkpoint
 from megatron.training import get_args
 
 @dataclass
@@ -144,30 +142,16 @@ class FastMLP(MegatronModule):
         return sharded_state_dict
 
 def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
-    print("Intermediate Parallel shape:", intermediate_parallel.shape)
-    print("Bias Parallel shape:", bias_parallel.shape)
-    print("Master Node Width:", master_node_width)
-    print("Parallel Trees:", parallel_trees)
-    print("Depth:", depth)
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
-
-    print("Flatten Intermediate shape 0 :", flatten_intermediate.shape)
-    print("Bias Parallel shape 0 :", bias_parallel.shape)
-    
     logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
-    flatten_intermediate = bias_gelu_impl(intermediate_parallel, bias_parallel)
-    print("Flatten Intermediate shape: 1", flatten_intermediate.shape)
-    flatten_intermediate = flatten_intermediate.view(-1, intermediate_parallel.size(-1))
-    print("Flatten Intermediate shape: 2", flatten_intermediate.shape)
+    flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
     batch_size = flatten_intermediate.size(0)
 
     decisions = logit_decisions.view(batch_size, parallel_trees, -1) # (batch_size, parallel_size, n_nodes)
-    print("Decisions shape:", decisions.shape)
     with torch.no_grad():
         current_nodes = torch.zeros((batch_size, parallel_trees), dtype=torch.long, device=intermediate_parallel.device)
         decision_map = torch.zeros_like(decisions, dtype=torch.bfloat16, device=intermediate_parallel.device) # (batch_size, parallel_size, n_nodes)
-        print("Decision map shape 1:", decision_map.shape)
         decision_map.scatter_(dim=2, index=current_nodes.unsqueeze(-1), value=1.0) # set the first node to 1
         for d in range(depth-1):
             current_platform = 2 ** d - 1
@@ -176,10 +160,7 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
-        print("Decision map shape 2:", decision_map.shape)
         decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
-        print("Decision map shape 3:", decision_map.shape)
-    print("Flatten intermediate shape 3 :", flatten_intermediate.shape)
     flatten_intermediate =  flatten_intermediate * decision_map
     return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)

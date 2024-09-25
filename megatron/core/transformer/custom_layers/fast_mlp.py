@@ -81,7 +81,7 @@ class FastMLP(MegatronModule):
         #     ffn_hidden_size *= 2
         # We divide by four as each gpu will activate a part of the hiddensize
         self.master_node_width = int(submodules.master_node_width) 
-        self.master_node_width_by_gpu = int(submodules.master_node_width / tensor_model_parallel_size)
+        self.master_node_width_by_parallel_tree = int(submodules.master_node_width / submodules.parallel_trees)
         print(f"Master Node Width: {self.master_node_width}")
         self.parallel_trees = submodules.parallel_trees
         print(f"Parallel Trees: {self.parallel_trees}")
@@ -126,7 +126,7 @@ class FastMLP(MegatronModule):
         intermediate_parallel = apply_custom_fff_activation(
             intermediate_parallel, 
             bias_parallel, 
-            self.master_node_width_by_gpu, 
+            self.master_node_width_by_parallel_tree, 
             self.parallel_trees_by_gpu, 
             self.depth,
         )
@@ -168,7 +168,7 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
-        decision_map[:, :, -master_node_width:] = 1.0
+        decision_map[:, :, master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
     print("Intermediate Parallel shape:", intermediate_parallel.shape)
     intermediate_parallel =  intermediate_parallel * decision_map

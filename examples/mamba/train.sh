@@ -1,105 +1,96 @@
-#!/bin/bash
+ #!/bin/bash
 
-# Use: ./train.sh <data-path> <tokenizer-path>
+# Runs the "175B" parameter model
 
-MODEL_SCALE="800M" # or "8B"
-
-case "${MODEL_SCALE}" in
-    "800M")
-        TENSOR_MODEL_PARALLEL_SIZE=1
-        NUM_LAYERS=48
-        HIDDEN_SIZE=1024
-        NUM_ATTENTION_HEADS=16
-        GLOBAL_BATCH_SIZE=32
-        ;;
-    "8B")
-        TENSOR_MODEL_PARALLEL_SIZE=4
-        NUM_LAYERS=56
-        HIDDEN_SIZE=4096
-        NUM_ATTENTION_HEADS=32
-        GLOBAL_BATCH_SIZE=8
-        ;;
-    *)
-        echo "Invalid version specified"
-        exit 1
-        ;;
-esac
-
-DATA_PATH=$1
-TOKENIZER_PATH=$2
-
-export NCCL_IB_SL=1
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-export NCCL_IB_TIMEOUT=19
-export NCCL_IB_QPS_PER_CONNECTION=4
 
-CHECKPOINT_DIR="./checkpoints"
-DATACACHE_DIR="./data-cache"
-TENSORBOARD_DIR="./tensorboard"
+GPUS_PER_NODE=4
+MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+MASTER_PORT=48994
+NUM_NODES=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | wc -l)
+WORLD_SIZE=$(($GPUS_PER_NODE*$NUM_NODES))
+echo "Master Address : "$MASTER_ADDR" | "$NUM_NODES" Nodes | World Size : "$WORLD_SIZE
 
-mkdir -p ${CHECKPOINT_DIR}
-mkdir -p ${DATACACHE_DIR}
-mkdir -p ${TENSORBOARD_DIR}
+CHECKPOINT_PATH=$1 #<Specify path>
+TENSORBOARD_LOGS_PATH=$2 #<Specify path>
+VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
+DATA_PATH=$4 #<Specify path and file prefix>_text_document
 
-export TRITON_CACHE_DIR="./triton-cache/"
-export TRITON_CACHE_MANAGER="megatron.core.ssm.triton_cache_manager:ParallelFileCacheManager"
+DISTRIBUTED_ARGS=(
+    --nproc_per_node $GPUS_PER_NODE 
+    --nnodes $NUM_NODES 
+    --master_addr $MASTER_ADDR 
+    --master_port $MASTER_PORT
+    --rdzv_id $SLURM_JOB_ID
+    --rdzv_endpoint $MASTER_ADDR:29500
+    --rdzv_backend c10d
+)
 
-SEQ_LEN=4096
-TRAIN_SAMPLES=73242188  # 300B tokens / 4096
-LR_WARMUP_SAMPLES=50000
-LR_DECAY_SAMPLES=73192188 # TRAIN_SAMPLES - LR_WARMUP_SAMPLES
+GPT_MODEL_ARGS=(
+    --num-layers 16 
+    --hidden-size 1920 
+    --num-attention-heads 8 
+    --seq-length 4096 
+    --max-position-embeddings 4096
+    --seed 42
+    --hybrid-mlp-ratio 0.5 \
+    --hybrid-attention-ratio 0.0 \
 
-options=" \
-       --tensor-model-parallel-size ${TENSOR_MODEL_PARALLEL_SIZE} \
-       --sequence-parallel \
-       --pipeline-model-parallel-size 1 \
-       --use-distributed-optimizer \
-       --overlap-param-gather \
-       --overlap-grad-reduce \
-       --untie-embeddings-and-output-weights \
-       --init-method-std 0.02 \
-       --position-embedding-type none \
-       --num-layers ${NUM_LAYERS} \
-       --hidden-size ${HIDDEN_SIZE} \
-       --num-attention-heads ${NUM_ATTENTION_HEADS} \
-       --group-query-attention \
-       --num-query-groups 8 \
-       --hybrid-attention-ratio 0.08 \
-       --hybrid-mlp-ratio 0.5 \
-       --seq-length ${SEQ_LEN} \
-       --max-position-embeddings ${SEQ_LEN} \
-       --train-samples ${TRAIN_SAMPLES} \
-       --lr-warmup-samples ${LR_WARMUP_SAMPLES} \
-       --lr-decay-samples ${LR_DECAY_SAMPLES} \
-       --save ${CHECKPOINT_DIR} \
-       --load ${CHECKPOINT_DIR} \
-       --data-path ${DATA_PATH} \
-       --data-cache-path ${DATACACHE_DIR} \
-       --split 99,1,0 \
-       --tokenizer-type GPTSentencePieceTokenizer \
-       --tokenizer-model ${TOKENIZER_PATH} \
-       --distributed-backend nccl \
-       --micro-batch-size 4 \
-       --global-batch-size ${GLOBAL_BATCH_SIZE} \
-       --lr 2.5e-4 \
-       --min-lr 2.5e-5 \
-       --lr-decay-style cosine \
-       --weight-decay 0.1 \
-       --clip-grad 1.0 \
-       --attention-dropout 0.0 \
-       --hidden-dropout 0.0 \
-       --disable-bias-linear \
-       --normalization RMSNorm \
-       --adam-beta1 0.9 \
-       --adam-beta2 0.95 \
-       --log-interval 10 \
-       --save-interval 2000 \
-       --eval-interval 2000 \
-       --eval-iters 32 \
-       --bf16 \
-       --use-mcore-models \
-       --spec megatron.core.models.mamba.mamba_layer_specs mamba_stack_spec \
-       --no-create-attention-mask-in-dataloader \
-       --tensorboard-dir ${TENSORBOARD_DIR}"
 
-torchrun --nproc_per_node 8 ../../pretrain_mamba.py ${options}
+)
+
+TRAINING_ARGS=(
+    --num-workers 16
+    --micro-batch-size 1
+    --train-samples 12207050 
+    --weight-decay 0.1 
+    --adam-beta1 0.9 
+    --adam-beta2 0.95 
+    --init-method-std 0.006 
+    --clip-grad 1.0 
+    --bf16
+    --lr 1.0e-4 
+    --lr-decay-style cosine 
+    --min-lr 1.0e-5
+    --lr-warmup-fraction .001 
+    #--lr-decay-iters 430000 
+    --use-flash-attn
+    #--use-distributed-optimizer
+)
+
+MODEL_PARALLEL_ARGS=(
+	--tensor-model-parallel-size 1
+	--pipeline-model-parallel-size 1
+    --sequence-parallel \
+
+)
+
+DATA_ARGS=(
+    --data-path $DATA_PATH 
+    --tokenizer-type HuggingFacePretrainedTokenizer
+    --tokenizer-model $VOCAB_FILE
+    --split 975,24,1
+    --vocab-size 50304
+)
+
+EVAL_AND_LOGGING_ARGS=(
+    --log-interval 100
+    --save-interval 10000 
+    --eval-interval 1000 
+    --save $CHECKPOINT_PATH 
+    --load $CHECKPOINT_PATH 
+    --eval-iters 10
+    --tensorboard-dir $TENSORBOARD_LOGS_PATH
+    --ckpt-format torch
+    --log-validation-ppl-to-tensorboard
+    --log-memory-to-tensorboard
+    --log-world-size-to-tensorboard
+    --log-throughput
+)
+
+srun torchrun ${DISTRIBUTED_ARGS[@]}../../pretrain_mamba.py \
+    ${GPT_MODEL_ARGS[@]} \
+    ${TRAINING_ARGS[@]} \
+    ${MODEL_PARALLEL_ARGS[@]} \
+    ${DATA_ARGS[@]} \
+    ${EVAL_AND_LOGGING_ARGS[@]}

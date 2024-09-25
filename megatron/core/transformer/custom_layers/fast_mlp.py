@@ -168,8 +168,8 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
-        decision_map[:, :, master_node_width:] = 1.0
+        decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
     print("Intermediate Parallel shape:", intermediate_parallel.shape)
-    intermediate_parallel =  intermediate_parallel * decision_map
-    return intermediate_parallel.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)
+    flatten_intermediate =  flatten_intermediate * decision_map
+    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)

@@ -36,8 +36,6 @@ GPT_MODEL_ARGS=(
     --hybrid-mlp-ratio 0.5
     --hybrid-attention-ratio 0.0
     --spec megatron.core.models.mamba.mamba_layer_specs mamba_stack_spec
-
-
 )
 
 TRAINING_ARGS=(
@@ -62,7 +60,6 @@ TRAINING_ARGS=(
 MODEL_PARALLEL_ARGS=(
 	--tensor-model-parallel-size 1
 	--pipeline-model-parallel-size 1
-    --sequence-parallel \
 
 )
 

@@ -168,7 +168,7 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
-        decision_map[:, :, -master_node_width:] = 1.0
+        decision_map[:, :, -master_node_width:] = torch.tensor(1.0, device=decision_map.device)
         decision_map = decision_map.flatten(1,2)
     print("Intermediate Parallel shape:", intermediate_parallel.shape)
     flatten_intermediate =  flatten_intermediate * decision_map

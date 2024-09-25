@@ -14,9 +14,7 @@ from megatron.core.dist_checkpointing.mapping import (
     ShardedStateDict,
     ShardedTensorFactory,
 )
-from megatron.core.fusions.fused_bias_geglu import bias_geglu_impl
 from megatron.core.fusions.fused_bias_gelu import bias_gelu_impl
-from megatron.core.fusions.fused_bias_swiglu import bias_swiglu_impl
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
@@ -158,7 +156,7 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
     
     logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
-    flatten_intermediate = bias_geglu_impl(intermediate_parallel, bias_parallel)
+    flatten_intermediate = bias_gelu_impl(intermediate_parallel, bias_parallel)
     print("Flatten Intermediate shape: 1", flatten_intermediate.shape)
     flatten_intermediate = flatten_intermediate.view(-1, intermediate_parallel.size(-1))
     print("Flatten Intermediate shape: 2", flatten_intermediate.shape)

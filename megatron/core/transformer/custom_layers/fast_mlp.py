@@ -157,7 +157,9 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
     logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
     flatten_intermediate = bias_geglu_impl(flatten_intermediate, bias_parallel)
-    
+    print("Flatten Intermediate shape: 1", flatten_intermediate.shape)
+    flatten_intermediate = flatten_intermediate.view(-1, intermediate_parallel.size(-1))
+    print("Flatten Intermediate shape: 2", flatten_intermediate.shape)
     batch_size = flatten_intermediate.size(0)
 
     decisions = logit_decisions.view(batch_size, parallel_trees, -1) # (batch_size, parallel_size, n_nodes)
@@ -178,6 +180,6 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
         decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
         print("Decision map shape 3:", decision_map.shape)
-    print("Intermediate Parallel shape:", intermediate_parallel.shape)
+    print("Flatten intermediate shape 3 :", flatten_intermediate.shape)
     flatten_intermediate =  flatten_intermediate * decision_map
     return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)

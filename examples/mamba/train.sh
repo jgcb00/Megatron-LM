@@ -33,8 +33,9 @@ GPT_MODEL_ARGS=(
     --seq-length 4096 
     --max-position-embeddings 4096
     --seed 42
-    --hybrid-mlp-ratio 0.5 \
-    --hybrid-attention-ratio 0.0 \
+    --hybrid-mlp-ratio 0.5
+    --hybrid-attention-ratio 0.0
+    --spec megatron.core.models.mamba.mamba_layer_specs mamba_stack_spec
 
 
 )
@@ -88,7 +89,7 @@ EVAL_AND_LOGGING_ARGS=(
     --log-throughput
 )
 
-srun torchrun ${DISTRIBUTED_ARGS[@]}../../pretrain_mamba.py \
+srun torchrun ${DISTRIBUTED_ARGS[@]} ../../Megatron-LM/pretrain_mamba.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

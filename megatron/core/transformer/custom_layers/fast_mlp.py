@@ -166,6 +166,7 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             next_platform = 2 ** (d + 1) - 1
             moves = torch.gather(decisions, 2, current_nodes.unsqueeze(2)).squeeze(2)
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
+            print("Next nodes :", next_nodes)
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = torch.tensor(1.0, device=decision_map.device)

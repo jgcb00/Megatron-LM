@@ -148,10 +148,11 @@ class FastMLP(MegatronModule):
 def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
     
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
+    bias_parallel = bias_parallel.view(-1, bias_parallel.size(-1))
     
     logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
-    intermediate_parallel = bias_geglu_impl(intermediate_parallel, bias_parallel)
+    flatten_intermediate = bias_geglu_impl(flatten_intermediate, bias_parallel)
     
     batch_size = flatten_intermediate.size(0)
 
@@ -169,7 +170,7 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             print("Next nodes :", next_nodes)
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
-        decision_map[:, :, -master_node_width:] = torch.tensor(1.0, device=decision_map.device)
+        decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
     print("Intermediate Parallel shape:", intermediate_parallel.shape)
     flatten_intermediate =  flatten_intermediate * decision_map

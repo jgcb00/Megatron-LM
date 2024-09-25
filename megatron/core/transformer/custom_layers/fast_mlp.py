@@ -165,7 +165,7 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
     with torch.no_grad():
         current_nodes = torch.zeros((batch_size, parallel_trees), dtype=torch.long, device=intermediate_parallel.device)
         decision_map = torch.zeros_like(decisions, dtype=torch.bfloat16, device=intermediate_parallel.device) # (batch_size, parallel_size, n_nodes)
-        print("Decision map shape:", decision_map.shape)
+        print("Decision map shape 1:", decision_map.shape)
         decision_map.scatter_(dim=2, index=current_nodes.unsqueeze(-1), value=1.0) # set the first node to 1
         for d in range(depth-1):
             current_platform = 2 ** d - 1
@@ -174,8 +174,10 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
+        print("Decision map shape 2:", decision_map.shape)
         decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
+        print("Decision map shape 3:", decision_map.shape)
     print("Intermediate Parallel shape:", intermediate_parallel.shape)
     flatten_intermediate =  flatten_intermediate * decision_map
     return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)

@@ -23,6 +23,9 @@ DISTRIBUTED_ARGS=(
     --nnodes $NUM_NODES 
     --master_addr $MASTER_ADDR 
     --master_port $MASTER_PORT
+    --rdzv_id $SLURM_JOB_ID
+    --rdzv_endpoint $MASTER_ADDR:29500
+    --rdzv_backend c10d
 )
 
 GPT_MODEL_ARGS=(

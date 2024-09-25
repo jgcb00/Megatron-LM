@@ -153,6 +153,8 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
     print("Depth:", depth)
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
     bias_parallel = bias_parallel.view(-1, bias_parallel.size(-1))
+    print("Flatten Intermediate shape 0 :", flatten_intermediate.shape)
+    print("Bias Parallel shape 0 :", bias_parallel.shape)
     
     logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)

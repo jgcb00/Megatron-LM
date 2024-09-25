@@ -146,7 +146,11 @@ class FastMLP(MegatronModule):
         return sharded_state_dict
 
 def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
-    
+    print("Intermediate Parallel shape:", intermediate_parallel.shape)
+    print("Bias Parallel shape:", bias_parallel.shape)
+    print("Master Node Width:", master_node_width)
+    print("Parallel Trees:", parallel_trees)
+    print("Depth:", depth)
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
     bias_parallel = bias_parallel.view(-1, bias_parallel.size(-1))
     
@@ -161,13 +165,13 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
     with torch.no_grad():
         current_nodes = torch.zeros((batch_size, parallel_trees), dtype=torch.long, device=intermediate_parallel.device)
         decision_map = torch.zeros_like(decisions, dtype=torch.bfloat16, device=intermediate_parallel.device) # (batch_size, parallel_size, n_nodes)
+        print("Decision map shape:", decision_map.shape)
         decision_map.scatter_(dim=2, index=current_nodes.unsqueeze(-1), value=1.0) # set the first node to 1
         for d in range(depth-1):
             current_platform = 2 ** d - 1
             next_platform = 2 ** (d + 1) - 1
             moves = torch.gather(decisions, 2, current_nodes.unsqueeze(2)).squeeze(2)
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
-            print("Next nodes :", next_nodes)
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = 1.0

@@ -19,6 +19,8 @@ from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.training import get_args
 
+from .fast_mlp_visualisation import fffn2picture
+
 @dataclass
 class FastMLPSubmodules:
     linear_fc1: Union[ModuleSpec, type] = None
@@ -57,7 +59,6 @@ class FastMLP(MegatronModule):
         tensor_model_parallel_size = args.tensor_model_parallel_size
         assert submodules.parallel_trees % tensor_model_parallel_size == 0, "FFFN Tree can't be divided between gpu"
         self.config: TransformerConfig = config
-
         self.input_size = input_size if input_size != None else self.config.hidden_size
         
         depth = int(ceil(log2(self.config.ffn_hidden_size/submodules.parallel_trees)))
@@ -96,7 +97,9 @@ class FastMLP(MegatronModule):
             is_expert=is_expert, #false
             tp_comm_buffer_name='fc1',
         )
-
+        self.usage = torch.zeros(ffn_hidden_size*4, dtype=torch.float16, device='cuda')
+        self.nb_tokens = 0
+        self.threshold = 1_000_000_000
         self.activation_func = self.config.activation_func #should be Gelu() F.gelu
 
         self.linear_fc2 = build_module(
@@ -119,14 +122,21 @@ class FastMLP(MegatronModule):
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
 
-        intermediate_parallel = apply_custom_fff_activation(
+        intermediate_parallel, mask = apply_custom_fff_activation(
             intermediate_parallel, 
             bias_parallel, 
             self.master_node_width_by_parallel_tree, 
             self.parallel_trees_by_gpu, 
             self.depth,
         )
-        
+        with torch.no_grad():
+            self.usage.to(mask.device)
+            self.usage += mask
+            self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
+            if self.nb_tokens > self.threshold:
+                self.threshold += 1_000_000_000
+                fffn2picture(self.usage, self.nb_tokens,self.parallel_trees_by_gpu, self.master_node_width_by_parallel_tree, hash(self))
+                
         # [s, b, h]
         output, output_bias = self.linear_fc2(intermediate_parallel)
 
@@ -162,5 +172,6 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1,2)
+        
     flatten_intermediate =  flatten_intermediate * decision_map
-    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1)
+    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1), torch.sum(decision_map, dim=0)

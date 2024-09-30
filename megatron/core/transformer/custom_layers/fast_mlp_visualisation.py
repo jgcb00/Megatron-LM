@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import networkx as nx
 from collections import deque
+import numpy as np
 import torch
 
 # Define the TreeNode class to store the activation count
@@ -14,31 +15,32 @@ class TreeNode:
 
 # Function to convert matrix into a binary tree (matrix holds activation counts)
 def matrix_to_binary_tree(matrix, number_of_tokens):
-    if not matrix:
-        return None
+    if matrix.size == 0:
+        return None, 0
     
     # Create the root node with its activation count
     root = TreeNode(matrix[0], 0, 1)
     queue = deque([root])
     i = 1
-    max = 0    
-    while queue and i < len(matrix):
+    max_activation = 0    
+    while queue and i < matrix.size:
         current = queue.popleft()
         value = matrix[i] / number_of_tokens
         activation_count = matrix[i] / number_of_tokens / 2 ** -(current.depth+1)
-        if activation_count > max:
-            max = activation_count
-        if i < len(matrix):
+        if activation_count > max_activation:
+            max_activation = activation_count
+        if i < matrix.size:
             current.left = TreeNode(value, current.depth+1, activation_count)
             queue.append(current.left)
             i += 1
         
-        if i < len(matrix):
+        if i < matrix.size:
             current.right = TreeNode(value, current.depth+1, activation_count)
             queue.append(current.right)
             i += 1
     
-    return root, max
+    return root, max_activation
+
 
 def add_edges(G, node, pos, x=0, y=0, layer=1):
     if node is not None:
@@ -85,6 +87,7 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     print(f"Binary tree with activation counts saved as {file_name}")
     plt.close()
 
+
 def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_tree, id_matrix):
     matrix = matrix.view(number_of_tree, -1)
     matrix = matrix[:, :-width_master_node_by_tree]
@@ -92,6 +95,9 @@ def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_
     
     for idx, tree in enumerate(matrix):
         root, max_activation = matrix_to_binary_tree(tree, number_of_tokens)
-        tree = tree / number_of_tokens
-        plot_binary_tree(root, tree, max_activation, f"{id_matrix}_{idx}.jpg")
-        print(f"ID: {id_matrix} Tree {idx} done for {number_of_tokens:,} tokens")
+        if root is not None:
+            tree = tree / number_of_tokens
+            plot_binary_tree(root, tree, max_activation, f"{id_matrix}_{idx}.jpg")
+            print(f"ID: {id_matrix} Tree {idx} done for {number_of_tokens:,} tokens")
+        else:
+            print(f"ID: {id_matrix} Tree {idx} is empty, skipping visualization")

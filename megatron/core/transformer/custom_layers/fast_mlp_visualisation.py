@@ -53,6 +53,7 @@ def add_edges(G, node, pos, x=0, y=0, layer=1):
             pos = add_edges(G, node.right, pos, x + 1 / layer, y - 1, layer + 1)
     return pos
 
+
 def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activated.jpg"):
     G = nx.DiGraph()
     pos = add_edges(G, root, pos={})
@@ -60,32 +61,41 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     node_pos = nx.get_node_attributes(G, 'pos')
     activation_counts = nx.get_node_attributes(G, 'activation_count')
     
-    plt.figure(figsize=(12, 9))
+    fig, ax = plt.subplots(figsize=(12, 9))
     
     # Normalize sizes and colors
     sizes = [count * 1000 / max_activation for count in activation_counts.values()]
     colors = list(activation_counts.values())
     
-    nx.draw(
+    nodes = nx.draw_networkx_nodes(
         G, 
-        node_pos, 
-        with_labels=True,
-        labels={node: f"{node:.3f}" for node in G.nodes()},
+        node_pos,
         node_size=sizes, 
         node_color=colors,
         cmap=plt.cm.Blues,
         vmin=0,
         vmax=max_activation,
-        font_size=8, 
-        font_weight='bold', 
-        arrows=False
+        ax=ax
     )
     
-    plt.colorbar(plt.cm.ScalarMappable(cmap=plt.cm.Blues, norm=plt.Normalize(vmin=0, vmax=max_activation)))
-    plt.title(f"Binary Tree Visualization (Max Activation: {max_activation:.2f})")
+    nx.draw_networkx_edges(G, node_pos, ax=ax)
+    nx.draw_networkx_labels(
+        G, 
+        node_pos, 
+        labels={node: f"{node:.3f}" for node in G.nodes()},
+        font_size=8, 
+        font_weight='bold',
+        ax=ax
+    )
+    
+    plt.colorbar(nodes, ax=ax, label='Activation Count')
+    ax.set_title(f"Binary Tree Visualization (Max Activation: {max_activation:.2f})")
+    ax.axis('off')
+    
+    plt.tight_layout()
     plt.savefig(file_name, format="jpg", dpi=300, bbox_inches='tight')
     print(f"Binary tree with activation counts saved as {file_name}")
-    plt.close()
+    plt.close(fig)
 
 
 def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_tree, id_matrix):

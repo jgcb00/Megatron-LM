@@ -381,7 +381,7 @@ def _warmup_jit_function():
             if args.swiglu:
                 output = bias_swiglu(input, bias)
             else:
-                output = bias_gelu(bias, input)
+                output = bias_gelu(input)
     del bias, input, output
 
     # Warmup fused bias+dropout+add

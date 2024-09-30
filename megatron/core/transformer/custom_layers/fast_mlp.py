@@ -131,8 +131,8 @@ class FastMLP(MegatronModule):
         )
         with torch.no_grad():
             self.usage.to(mask.device)
-            self.usage += mask
             print(mask)
+            self.usage += mask
             self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
             if self.nb_tokens > self.threshold:
                 self.threshold += 1_000_000
@@ -175,4 +175,4 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
         decision_map = decision_map.flatten(1,2)
         
     flatten_intermediate =  flatten_intermediate * decision_map
-    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1), torch.sum(decision_map, dim=0).astype(torch.int32)
+    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1), torch.sum(decision_map, dim=0).to(torch.int64)

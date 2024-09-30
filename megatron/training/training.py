@@ -1585,7 +1585,7 @@ def evaluate_and_print_results(prefix, forward_step_func,
         string += '{} PPL: {:.6E} | '.format(key, ppl)
         if writer:
             writer.add_scalar('{} validation'.format(key),
-                              total_loss²_dict[key].item(),
+                              total_loss_dict[key].item(),
                               iteration)
             writer.add_scalar('{} validation vs samples'.format(key),
                               total_loss_dict[key].item(),

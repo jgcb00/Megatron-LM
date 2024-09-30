@@ -103,6 +103,6 @@ def fffn2picture(matrix : torch.Tensor, number_of_tokens : int, number_of_tree :
     matrix = matrix.cpu().numpy().tolist()
     for idx, tree in enumerate(matrix):
         root, max = matrix_to_binary_tree(tree, number_of_tokens)
-        tree = tree / number_of_tokens        
+        tree = [t / number_of_tokens for t in tree]        
         plot_binary_tree(root, tree, max, f"{id_matrix}_{idx}.jpg")
         print(f"ID: {id_matrix} Tree {idx} done for {number_of_tokens:,} tokens")

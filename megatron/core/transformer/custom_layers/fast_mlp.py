@@ -123,9 +123,9 @@ class FastMLP(MegatronModule):
 
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
-        intermediate_parallel = intermediate_parallel + bias_parallel
         intermediate_parallel, mask = apply_custom_fff_activation(
             intermediate_parallel, 
+            bias_parallel, 
             self.master_node_width_by_parallel_tree, 
             self.parallel_trees_by_gpu, 
             self.depth,
@@ -136,7 +136,7 @@ class FastMLP(MegatronModule):
             self.usage += mask
             self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
             if self.nb_tokens > self.threshold:
-                self.threshold = 200_000_000
+                self.threshold += 200_000_000
                 fffn2picture(self.usage, self.nb_tokens,self.parallel_trees_by_gpu, self.master_node_width_by_parallel_tree, hash(self))
                 self.usage.zero_()
                 self.nb_tokens = 0
@@ -154,12 +154,12 @@ class FastMLP(MegatronModule):
             sharded_state_dict.update(sub_sd)
         return sharded_state_dict
 
-def apply_custom_fff_activation(intermediate_parallel, master_node_width, parallel_trees, depth):
+def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
     
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
-    logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
+    logit_decisions = ((flatten_intermediate+bias_parallel) > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
-    flatten_intermediate = bias_gelu_impl(flatten_intermediate)
+    flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
     batch_size = flatten_intermediate.size(0)
 
     decisions = logit_decisions.view(batch_size, parallel_trees, -1) # (batch_size, parallel_size, n_nodes)

@@ -97,7 +97,7 @@ class FastMLP(MegatronModule):
             is_expert=is_expert, #false
             tp_comm_buffer_name='fc1',
         )
-        self.usage = torch.zeros(ffn_hidden_size, dtype=torch.float16, device='cuda')
+        self.usage = torch.zeros(ffn_hidden_size, dtype=torch.int32, device='cuda')
         self.nb_tokens = 0
         self.threshold = 491500
         self.activation_func = self.config.activation_func #should be Gelu() F.gelu
@@ -132,8 +132,8 @@ class FastMLP(MegatronModule):
         with torch.no_grad():
             self.usage.to(mask.device)
             self.usage += mask
+            print(mask)
             self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
-            print("Nb Tokens: ", self.nb_tokens)
             if self.nb_tokens > self.threshold:
                 self.threshold += 1_000_000
                 fffn2picture(self.usage, self.nb_tokens,self.parallel_trees_by_gpu, self.master_node_width_by_parallel_tree, hash(self))
@@ -175,4 +175,4 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
         decision_map = decision_map.flatten(1,2)
         
     flatten_intermediate =  flatten_intermediate * decision_map
-    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1), torch.sum(decision_map, dim=0)
+    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1), torch.sum(decision_map, dim=0).astype(torch.int32)

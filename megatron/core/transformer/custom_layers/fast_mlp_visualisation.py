@@ -80,7 +80,7 @@ def plot_binary_tree(root, matrix, max, file_name="binary_tree_activated.jpg"):
         G, 
         node_pos, 
         with_labels=True, 
-        labels={node: f"{node:.3f}" for node in G.nodes()},  # Node labels
+        #labels={node: f"{node:.3f}" for node in G.nodes()},  # Node labels
         node_size=sizes, 
         node_color=colors, 
         cmap=cmap, 

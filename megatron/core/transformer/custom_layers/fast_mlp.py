@@ -125,7 +125,7 @@ class FastMLP(MegatronModule):
 
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
-        intermediate_parallel, mask = apply_custom_fff_activation(
+        intermediate_parallel = apply_custom_fff_activation(
             intermediate_parallel, 
             bias_parallel, 
             self.master_node_width_by_parallel_tree, 
@@ -181,4 +181,4 @@ def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_nod
         decision_map = decision_map.flatten(1,2)
         
     flatten_intermediate =  flatten_intermediate * decision_map
-    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1), torch.sum(decision_map, dim=0).to(torch.int64)
+    return flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1) # , torch.sum(decision_map, dim=0).to(torch.int64)

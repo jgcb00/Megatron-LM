@@ -64,7 +64,6 @@ class FastMLP(MegatronModule):
         
         depth = int(ceil(log2(self.config.ffn_hidden_size/submodules.parallel_trees)))
         
-        print(f"Depth: {depth}")
         if submodules.master_node and submodules.master_node_width is None:
             #it has to be a multiple of tensor_model_parallel_size, to avoid issue with tensor model parallelism
             submodules.master_node_width = ceil(depth / submodules.parallel_trees) * submodules.parallel_trees
@@ -73,16 +72,12 @@ class FastMLP(MegatronModule):
         
         #The fused kernel multiplies the hidden size by 4, so we need to divide by 4
         ffn_hidden_size = int((2**depth - 1) * submodules.parallel_trees + submodules.master_node_width)
-        print(f"FFN Hidden Size: {ffn_hidden_size}")
         
-        # if self.config.gated_linear_unit:
-        #     ffn_hidden_size *= 2
-        # We divide by four as each gpu will activate a part of the hiddensize
         self.master_node_width = int(submodules.master_node_width) 
         self.master_node_width_by_parallel_tree = int(submodules.master_node_width / submodules.parallel_trees)
-        print(f"Master Node Width: {self.master_node_width}")
+
         self.parallel_trees = submodules.parallel_trees
-        print(f"Parallel Trees: {self.parallel_trees}")
+
         self.parallel_trees_by_gpu = int(submodules.parallel_trees / tensor_model_parallel_size)
         self.depth = depth
 
@@ -102,8 +97,8 @@ class FastMLP(MegatronModule):
         )
         if self.visualisation:
             self.usage = torch.zeros(ffn_hidden_size, dtype=torch.int32, device='cuda')
-        self.nb_tokens = 0
-        self.threshold = 1_000_000
+            self.nb_tokens = 0
+            self.threshold = 1_000_000
         self.activation_func = self.config.activation_func #should be Gelu() F.gelu
 
         self.linear_fc2 = build_module(
@@ -160,7 +155,7 @@ class FastMLP(MegatronModule):
 def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
     
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
-    logit_decisions = ((flatten_intermediate) > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
+    logit_decisions = ((flatten_intermediate + bias_parallel) > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
     flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
     batch_size = flatten_intermediate.size(0)

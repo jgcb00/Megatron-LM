@@ -40,69 +40,58 @@ def matrix_to_binary_tree(matrix, number_of_tokens):
     
     return root, max
 
-    
-
-# Function to add edges and node properties (like size and color) to the graph
-def add_edges(G, node, pos, sizes, colors, x=0, y=0, layer=1):
+def add_edges(G, node, pos, x=0, y=0, layer=1):
     if node is not None:
-        # Add node with position and store size/color based on activation count
-        G.add_node(node.value, pos=(x, y))
-        sizes.append(node.activation_count * 300)  # Size proportional to activation count
-        colors.append(node.activation_count)  # Color intensity proportional to activation count
-        
-        # Recursively add children nodes
+        G.add_node(node.value, pos=(x, y), activation_count=node.activation_count)
         if node.left:
             G.add_edge(node.value, node.left.value)
-            pos = add_edges(G, node.left, pos, sizes, colors, x - 1 / layer, y - 1, layer + 1)
+            pos = add_edges(G, node.left, pos, x - 1 / layer, y - 1, layer + 1)
         if node.right:
             G.add_edge(node.value, node.right.value)
-            pos = add_edges(G, node.right, pos, sizes, colors, x + 1 / layer, y - 1, layer + 1)
-    
+            pos = add_edges(G, node.right, pos, x + 1 / layer, y - 1, layer + 1)
     return pos
 
-# Function to plot and save the binary tree as a JPEG image
-def plot_binary_tree(root, matrix, max, file_name="binary_tree_activated.jpg"):
-    G = nx.DiGraph()  # Directed graph for tree structure
-    sizes = []  # List to hold node sizes
-    colors = []  # List to hold node colors based on activation count
-    pos = add_edges(G, root, pos={}, sizes=sizes, colors=colors)
+def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activated.jpg"):
+    G = nx.DiGraph()
+    pos = add_edges(G, root, pos={})
     
-    # Extract node positions for visualization
     node_pos = nx.get_node_attributes(G, 'pos')
+    activation_counts = nx.get_node_attributes(G, 'activation_count')
     
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(12, 9))
     
-    # Normalize the color map based on activation counts
-    cmap = plt.cm.Blues
+    # Normalize sizes and colors
+    sizes = [count * 1000 / max_activation for count in activation_counts.values()]
+    colors = list(activation_counts.values())
     
-    # Draw the nodes with varying sizes and colors
     nx.draw(
         G, 
         node_pos, 
-        with_labels=True, 
-        #labels={node: f"{node:.3f}" for node in G.nodes()},  # Node labels
+        with_labels=True,
+        labels={node: f"{node:.3f}" for node in G.nodes()},
         node_size=sizes, 
-        node_color=colors, 
-        cmap=cmap, 
-        vmin=0, vmax=max,  # Normalize color map
-        font_size=12, 
+        node_color=colors,
+        cmap=plt.cm.Blues,
+        vmin=0,
+        vmax=max_activation,
+        font_size=8, 
         font_weight='bold', 
         arrows=False
     )
     
-    # Save the plot as a JPEG file
-    plt.colorbar(plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=max)))  # Color bar
-    plt.savefig(file_name, format="jpg")
+    plt.colorbar(plt.cm.ScalarMappable(cmap=plt.cm.Blues, norm=plt.Normalize(vmin=0, vmax=max_activation)))
+    plt.title(f"Binary Tree Visualization (Max Activation: {max_activation:.2f})")
+    plt.savefig(file_name, format="jpg", dpi=300, bbox_inches='tight')
     print(f"Binary tree with activation counts saved as {file_name}")
-    plt.show()
+    plt.close()
 
-
-def fffn2picture(matrix : torch.Tensor, number_of_tokens : int, number_of_tree : int, width_master_node_by_tree: int, id_matrix: int):
+def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_tree, id_matrix):
     matrix = matrix.view(number_of_tree, -1)
     matrix = matrix[:, :-width_master_node_by_tree]
-    matrix = matrix.cpu().numpy().tolist()
+    matrix = matrix.cpu().numpy()
+    
     for idx, tree in enumerate(matrix):
-        root, max = matrix_to_binary_tree(tree, number_of_tokens)
-        tree = [t / number_of_tokens for t in tree]        
-        plot_binary_tree(root, tree, max, f"{id_matrix}_{idx}.jpg")
+        root, max_activation = matrix_to_binary_tree(tree, number_of_tokens)
+        tree = tree / number_of_tokens
+        plot_binary_tree(root, tree, max_activation, f"{id_matrix}_{idx}.jpg")
         print(f"ID: {id_matrix} Tree {idx} done for {number_of_tokens:,} tokens")

@@ -4,7 +4,7 @@
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-GPUS_PER_NODE=4
+GPUS_PER_NODE=1
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 MASTER_PORT=48994
 NUM_NODES=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | wc -l)
@@ -38,7 +38,7 @@ GPT_MODEL_ARGS=(
 )
 
 TRAINING_ARGS=(
-    --num-workers 16
+    --num-workers 8
     --micro-batch-size 6 
     --train-samples 12207050 
     --weight-decay 0.1 
@@ -66,7 +66,7 @@ DATA_ARGS=(
     --data-path $DATA_PATH 
     --tokenizer-type HuggingFacePretrainedTokenizer
     --tokenizer-model $VOCAB_FILE 
-    --split 975,24,1
+    --split 0,999,1
     --vocab-size 50304
 )
 

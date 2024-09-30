@@ -64,7 +64,7 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     max_depth = max(pos[node][1] for node in pos)
     
     # Create a very large figure
-    fig_width = min(32, max(16, len(G) / 250))  # Adjust width based on number of nodes
+    fig_width = min(64, max(16, len(G) / 125))  # Adjust width based on number of nodes
     fig_height = min(32, max(16, max_depth))  # Adjust height based on tree depth
     fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=300)
     
@@ -104,7 +104,7 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     ax.axis('off')
     
     plt.tight_layout()
-    plt.savefig(file_name, format="png", dpi=900, bbox_inches='tight')
+    plt.savefig(file_name, format="png", dpi=300, bbox_inches='tight')
     print(f"Binary tree with activation counts saved as {file_name}")
     plt.close(fig)
     

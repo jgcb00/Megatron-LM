@@ -14,8 +14,7 @@ from megatron.core.jit import jit_fuser
 
 
 @jit_fuser
-def bias_gelu(bias, y):
-    x = bias + y
+def bias_gelu(x):
     return x * 0.5 * (1.0 + torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x)))
 
 
@@ -23,8 +22,7 @@ def bias_gelu(bias, y):
 # gradient of actual gelu is:
 # 0.5 * (1. + torch.erf(x * 0.70710678)) + 0.3989423 * x * torch.exp(-0.5 * x * x)
 @jit_fuser
-def bias_gelu_back(g, bias, y):
-    x = bias + y
+def bias_gelu_back(g, x):
     tanh_out = torch.tanh(0.79788456 * x * (1 + 0.044715 * x * x))
     # sqrt(2/pi) * 3 * 0.044715 -> 0.1070322243
     ff = 0.5 * x * ((1 - tanh_out * tanh_out) * (0.79788456 + 0.1070322243 * x * x)) + 0.5 * (
@@ -36,14 +34,14 @@ def bias_gelu_back(g, bias, y):
 class GeLUFunction(torch.autograd.Function):
     @staticmethod
     # bias is an optional argument
-    def forward(ctx, input, bias):
-        ctx.save_for_backward(input, bias)
-        return bias_gelu(bias, input)
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        return bias_gelu(x)
 
     @staticmethod
     def backward(ctx, grad_output):
-        input, bias = ctx.saved_tensors
-        tmp = bias_gelu_back(grad_output, bias, input)
+        x = ctx.saved_tensors
+        tmp = bias_gelu_back(grad_output, x)
         return tmp, tmp
 
     # This is required to make Sphinx happy :-(

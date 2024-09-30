@@ -2,11 +2,11 @@
 
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
-from math import log2, ceil
+from math import log2, ceil, sqrt
 import numpy as np
 import torch
 import torch.nn.functional as F
-
+from functools import partial
 from megatron.core import parallel_state
 from megatron.core.dist_checkpointing import ShardedTensor
 from megatron.core.dist_checkpointing.mapping import (
@@ -85,21 +85,23 @@ class FastMLP(MegatronModule):
         self.parallel_trees_by_gpu = int(submodules.parallel_trees / tensor_model_parallel_size)
         self.depth = depth
 
+        init_k = sqrt(1.0 / self.input_size)
         self.linear_fc1 = build_module(
             submodules.linear_fc1,
             self.input_size,
             ffn_hidden_size,
             config=self.config,
-            init_method=self.config.init_method, #will probably have to update this
+            init_method=partial(torch.nn.init.uniform_, a=-init_k, b=init_k), #will probably have to update this
             gather_output=False,
             bias=True, #self.config.add_bias_linear,
             skip_bias_add=True,
             is_expert=is_expert, #false
             tp_comm_buffer_name='fc1',
+            
         )
         self.usage = torch.zeros(ffn_hidden_size, dtype=torch.int32, device='cuda')
         self.nb_tokens = 0
-        self.threshold = 491500
+        self.threshold = 1_000_000
         self.activation_func = self.config.activation_func #should be Gelu() F.gelu
 
         self.linear_fc2 = build_module(
@@ -121,7 +123,7 @@ class FastMLP(MegatronModule):
 
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
-
+        intermediate_parallel = intermediate_parallel + bias_parallel
         intermediate_parallel, mask = apply_custom_fff_activation(
             intermediate_parallel, 
             bias_parallel, 
@@ -135,9 +137,10 @@ class FastMLP(MegatronModule):
             self.usage += mask
             self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
             if self.nb_tokens > self.threshold:
-                self.threshold += 1_000_000
+                self.threshold = 200_000_000
                 fffn2picture(self.usage, self.nb_tokens,self.parallel_trees_by_gpu, self.master_node_width_by_parallel_tree, hash(self))
-                
+                self.usage.zero_()
+                self.nb_tokens = 0
         # [s, b, h]
         output, output_bias = self.linear_fc2(intermediate_parallel)
 
@@ -152,11 +155,12 @@ class FastMLP(MegatronModule):
             sharded_state_dict.update(sub_sd)
         return sharded_state_dict
 
-def apply_custom_fff_activation(intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth):
+def apply_custom_fff_activation(intermediate_parallel, master_node_width, parallel_trees, depth):
+    
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
     logit_decisions = (flatten_intermediate > 0).long() # (batch_size, parallel_size * n_nodes + master_node_size)
     logit_decisions = logit_decisions.view(-1, parallel_trees, 2**depth-1 + master_node_width) # (batch_size, parallel_size, n_nodes)
-    flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
+    flatten_intermediate = bias_gelu_impl(flatten_intermediate)
     batch_size = flatten_intermediate.size(0)
 
     decisions = logit_decisions.view(batch_size, parallel_trees, -1) # (batch_size, parallel_size, n_nodes)

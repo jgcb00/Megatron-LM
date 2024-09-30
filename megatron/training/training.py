@@ -212,7 +212,7 @@ def pretrain(
         1) initialize Megatron.
         2) setup model, optimizer and lr schedule using the model_provider.
         3) call train_val_test_data_provider to get train/val/test datasets.
-        4) train the modle using the forward_step_func.
+        4) train the model using the forward_step_func.
 
     Args:
         train_valid_test_dataset_provider: a function that takes the size of
@@ -1585,7 +1585,7 @@ def evaluate_and_print_results(prefix, forward_step_func,
         string += '{} PPL: {:.6E} | '.format(key, ppl)
         if writer:
             writer.add_scalar('{} validation'.format(key),
-                              total_loss_dict[key].item(),
+                              total_loss²_dict[key].item(),
                               iteration)
             writer.add_scalar('{} validation vs samples'.format(key),
                               total_loss_dict[key].item(),

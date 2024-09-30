@@ -122,7 +122,8 @@ def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_
         root, max_activation = matrix_to_binary_tree(tree, number_of_tokens)
         if root is not None:
             tree = tree / number_of_tokens
-            plot_binary_tree(root, tree, max_activation, f"{id_matrix}_{idx}.png")
+            pretty_number_of_tokens = f"{number_of_tokens/10**9:.1f}B" if number_of_tokens >= 10**9 else f"{number_of_tokens/10**6:.2f}M"
+            plot_binary_tree(root, tree, max_activation, f"{id_matrix}_{idx}_{pretty_number_of_tokens}.png")
             print(f"ID: {id_matrix} Tree {idx} done for {number_of_tokens:,} tokens")
         else:
             print(f"ID: {id_matrix} Tree {idx} is empty, skipping visualization")

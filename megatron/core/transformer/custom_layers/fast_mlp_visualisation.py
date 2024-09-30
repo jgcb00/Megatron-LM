@@ -111,8 +111,9 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
 def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_tree, id_matrix):
     matrix = matrix.view(number_of_tree, -1)
     matrix = matrix[:, :-width_master_node_by_tree]
+    print(matrix)
     matrix = matrix.cpu().numpy()
-    
+    print(matrix)
     for idx, tree in enumerate(matrix):
         root, max_activation = matrix_to_binary_tree(tree, number_of_tokens)
         if root is not None:

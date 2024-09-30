@@ -126,7 +126,6 @@ class FastMLP(MegatronModule):
         intermediate_parallel = intermediate_parallel + bias_parallel
         intermediate_parallel, mask = apply_custom_fff_activation(
             intermediate_parallel, 
-            bias_parallel, 
             self.master_node_width_by_parallel_tree, 
             self.parallel_trees_by_gpu, 
             self.depth,

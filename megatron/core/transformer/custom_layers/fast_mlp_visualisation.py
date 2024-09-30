@@ -41,48 +41,47 @@ def matrix_to_binary_tree(matrix, number_of_tokens):
     
     return root, max_activation
 
-
-def add_edges(G, node, pos, x=0, y=0, layer=1):
-    if node is not None:
-        G.add_node(node.value, pos=(x, y), activation_count=node.activation_count)
-        if node.left:
-            G.add_edge(node.value, node.left.value)
-            pos = add_edges(G, node.left, pos, x - 1 / layer, y - 1, layer + 1)
-        if node.right:
-            G.add_edge(node.value, node.right.value)
-            pos = add_edges(G, node.right, pos, x + 1 / layer, y - 1, layer + 1)
-    return pos
-
-
 def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activated.jpg"):
+    def add_nodes_edges(node, x, y, level, G):
+        if node:
+            G.add_node(node, pos=(x, -y), activation=node.activation_count)
+            if node.left:
+                G.add_edge(node, node.left)
+                add_nodes_edges(node.left, x - 1 / (2 ** level), y + 1, level + 1, G)
+            if node.right:
+                G.add_edge(node, node.right)
+                add_nodes_edges(node.right, x + 1 / (2 ** level), y + 1, level + 1, G)
+
     G = nx.DiGraph()
-    pos = add_edges(G, root, pos={})
+    add_nodes_edges(root, 0, 0, 1, G)
     
-    node_pos = nx.get_node_attributes(G, 'pos')
-    activation_counts = nx.get_node_attributes(G, 'activation_count')
+    pos = nx.get_node_attributes(G, 'pos')
+    activation_counts = nx.get_node_attributes(G, 'activation')
     
-    fig, ax = plt.subplots(figsize=(12, 9))
+    fig, ax = plt.subplots(figsize=(15, 10))
     
     # Normalize sizes and colors
-    sizes = [count * 1000 / max_activation for count in activation_counts.values()]
+    max_size = 2000
+    min_size = 100
+    sizes = [min_size + (count / max_activation) * (max_size - min_size) for count in activation_counts.values()]
     colors = list(activation_counts.values())
     
     nodes = nx.draw_networkx_nodes(
         G, 
-        node_pos,
+        pos,
         node_size=sizes, 
         node_color=colors,
-        cmap=plt.cm.Blues,
+        cmap=plt.cm.viridis,
         vmin=0,
         vmax=max_activation,
         ax=ax
     )
     
-    nx.draw_networkx_edges(G, node_pos, ax=ax)
+    nx.draw_networkx_edges(G, pos, ax=ax, arrows=False)
     nx.draw_networkx_labels(
         G, 
-        node_pos, 
-        labels={node: f"{node:.3f}" for node in G.nodes()},
+        pos, 
+        labels={node: f"{node.value:.3f}" for node in G.nodes()},
         font_size=8, 
         font_weight='bold',
         ax=ax
@@ -96,7 +95,6 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     plt.savefig(file_name, format="jpg", dpi=300, bbox_inches='tight')
     print(f"Binary tree with activation counts saved as {file_name}")
     plt.close(fig)
-
 
 def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_tree, id_matrix):
     matrix = matrix.view(number_of_tree, -1)

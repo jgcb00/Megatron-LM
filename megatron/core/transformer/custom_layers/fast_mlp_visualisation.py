@@ -26,7 +26,7 @@ def matrix_to_binary_tree(matrix, number_of_tokens):
     while queue and i < matrix.size:
         current = queue.popleft()
         value = matrix[i] / number_of_tokens
-        activation_count = matrix[i] / number_of_tokens / 2 ** -(current.depth+1)
+        activation_count = matrix[i] * 2 **(current.depth+1) / number_of_tokens
         if activation_count > max_activation:
             max_activation = activation_count
         if i < matrix.size:
@@ -41,7 +41,7 @@ def matrix_to_binary_tree(matrix, number_of_tokens):
     
     return root, max_activation
 
-def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activated.jpg"):
+def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activated.png"):
     def add_nodes_edges(node, x, y, level, G):
         if node:
             G.add_node(node, pos=(x, -y), activation=node.activation_count)
@@ -58,11 +58,17 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     pos = nx.get_node_attributes(G, 'pos')
     activation_counts = nx.get_node_attributes(G, 'activation')
     
-    fig, ax = plt.subplots(figsize=(15, 10))
+    # Calculate the depth of the tree
+    max_depth = max(pos[node][1] for node in pos)
+    
+    # Create a very large figure
+    fig_width = min(32, max(16, len(G) / 250))  # Adjust width based on number of nodes
+    fig_height = min(32, max(16, max_depth))  # Adjust height based on tree depth
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=300)
     
     # Normalize sizes and colors
-    max_size = 2000
-    min_size = 100
+    max_size = 100  # Reduced max size due to increased number of nodes
+    min_size = 1    # Smaller minimum size
     sizes = [min_size + (count / max_activation) * (max_size - min_size) for count in activation_counts.values()]
     colors = list(activation_counts.values())
     
@@ -77,25 +83,29 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
         ax=ax
     )
     
-    nx.draw_networkx_edges(G, pos, ax=ax, arrows=False)
+    # Draw edges with very thin lines
+    nx.draw_networkx_edges(G, pos, ax=ax, arrows=False, width=0.1, alpha=0.5)
+    
+    # Only label nodes near the top of the tree
+    top_nodes = {node: f"{node.value:.3f}" for node in G.nodes() if pos[node][1] > -5}
     nx.draw_networkx_labels(
         G, 
         pos, 
-        labels={node: f"{node.value:.3f}" for node in G.nodes()},
-        font_size=8, 
+        labels=top_nodes,
+        font_size=4, 
         font_weight='bold',
         ax=ax
     )
     
     plt.colorbar(nodes, ax=ax, label='Activation Count')
-    ax.set_title(f"Binary Tree Visualization (Max Activation: {max_activation:.2f})")
+    ax.set_title(f"Binary Tree Visualization\nNodes: {len(G)}, Max Activation: {max_activation:.2f}", fontsize=10)
     ax.axis('off')
     
     plt.tight_layout()
-    plt.savefig(file_name, format="jpg", dpi=300, bbox_inches='tight')
+    plt.savefig(file_name, format="png", dpi=300, bbox_inches='tight')
     print(f"Binary tree with activation counts saved as {file_name}")
     plt.close(fig)
-
+    
 def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_tree, id_matrix):
     matrix = matrix.view(number_of_tree, -1)
     matrix = matrix[:, :-width_master_node_by_tree]

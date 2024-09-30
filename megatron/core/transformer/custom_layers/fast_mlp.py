@@ -97,7 +97,7 @@ class FastMLP(MegatronModule):
             is_expert=is_expert, #false
             tp_comm_buffer_name='fc1',
         )
-        self.usage = torch.zeros(ffn_hidden_size*4, dtype=torch.float16, device='cuda')
+        self.usage = torch.zeros(ffn_hidden_size, dtype=torch.float16, device='cuda')
         self.nb_tokens = 0
         self.threshold = 1_000_000_000
         self.activation_func = self.config.activation_func #should be Gelu() F.gelu

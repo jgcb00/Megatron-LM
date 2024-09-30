@@ -28,7 +28,7 @@ def matrix_to_binary_tree(matrix, number_of_tokens):
         value = matrix[i] / number_of_tokens
         activation_count = matrix[i] * 2 **(current.depth+1) / number_of_tokens
         if activation_count == np.inf:
-            print(f"Activation count is infinite for occ : {matrix[i]}, depth : {current.depth+1}, nb_tokens : {number_of_tokens}" )
+            print(f"Activation count is infinite for occ : {matrix[i]}, depth : {current.depth+1}, nb_tokens : {number_of_tokens}, matrix dtype : {matrix.dtype}")
         if activation_count > max_activation:
             max_activation = activation_count
         if i < matrix.size:

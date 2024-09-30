@@ -104,7 +104,7 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     ax.axis('off')
     
     plt.tight_layout()
-    plt.savefig(file_name, format="png", dpi=300, bbox_inches='tight')
+    plt.savefig(file_name, format="png", dpi=900, bbox_inches='tight')
     print(f"Binary tree with activation counts saved as {file_name}")
     plt.close(fig)
     

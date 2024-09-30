@@ -13,6 +13,10 @@ class TreeNode:
         self.left = None
         self.right = None
 
+
+def get_value(value, number_of_tokens, depth):
+    return value / number_of_tokens, value * 2 ** depth / number_of_tokens
+
 # Function to convert matrix into a binary tree (matrix holds activation counts)
 def matrix_to_binary_tree(matrix, number_of_tokens):
     if matrix.size == 0:
@@ -25,18 +29,18 @@ def matrix_to_binary_tree(matrix, number_of_tokens):
     max_activation = 0    
     while queue and i < matrix.size:
         current = queue.popleft()
-        value = matrix[i] / number_of_tokens
-        activation_count = matrix[i] * 2 **(current.depth+1) / number_of_tokens
-        if activation_count == np.inf:
-            print(f"Activation count is infinite for occ : {matrix[i]}, depth : {current.depth+1}, nb_tokens : {number_of_tokens}, matrix dtype : {matrix.dtype}")
-        if activation_count > max_activation:
-            max_activation = activation_count
         if i < matrix.size:
+            value, activation_count = get_value(matrix[i], number_of_tokens, current.depth+1)
+            if activation_count > max_activation:
+                max_activation = activation_count
             current.left = TreeNode(value, current.depth+1, activation_count)
             queue.append(current.left)
             i += 1
         
         if i < matrix.size:
+            value, activation_count = get_value(matrix[i], number_of_tokens, current.depth+1)
+            if activation_count > max_activation:
+                max_activation = activation_count
             current.right = TreeNode(value, current.depth+1, activation_count)
             queue.append(current.right)
             i += 1

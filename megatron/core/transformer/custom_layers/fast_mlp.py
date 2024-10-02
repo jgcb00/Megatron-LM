@@ -3,12 +3,10 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 from math import log2, ceil, sqrt
-import numpy as np
 import torch
 import torch.nn.functional as F
+import torch.distributed as dist
 from functools import partial
-from megatron.core import parallel_state
-from megatron.core.dist_checkpointing import ShardedTensor
 from megatron.core.dist_checkpointing.mapping import ReplicaId, ShardedStateDict
 from megatron.core.fusions.fused_bias_gelu import bias_gelu_impl
 from megatron.core.transformer.module import MegatronModule
@@ -123,24 +121,30 @@ class FastMLP(MegatronModule):
         )
 
         self.update_rate = update_rate
-        self.lb_bias = torch.nn.Parameter(torch.zeros((ffn_hidden_size,)), requires_grad=False)
+        self.lb_bias = torch.nn.Parameter(torch.zeros((ffn_hidden_size,)), requires_grad=False, device='cuda', dtype=torch.bfloat16)
+        self.update_sign = None
 
     def forward(self, hidden_states):
         # Here we take the assumptions of the leonardo booster node that have 4 GPUs
         # Meaning we will try one binary tree per GPU
-
+        if self.update_sign is not None:
+            self.update_sign.wait()
+            self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
+            self.lb_bias += self.update_rate * self.update_sign
+            self.update_sign = None
+    
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
         intermediate_parallel, update_sign = apply_custom_fff_activation(
             intermediate_parallel,
             bias_parallel,
+            self.lb_bias,
             self.master_node_width_by_parallel_tree,
             self.parallel_trees_by_gpu,
             self.depth,
             self.lb_bias,
         )
-        self.lb_bias.add_(update_sign * self.update_rate)
-
+        self.update_sign = dist.all_reduce(update_sign, op=dist.ReduceOp.SUM, async_op=True)
         if self.visualisation:
             with torch.no_grad():
                 self.usage.to(mask.device)
@@ -174,7 +178,7 @@ class FastMLP(MegatronModule):
 
 
 def apply_custom_fff_activation(
-    intermediate_parallel, bias_parallel, master_node_width, parallel_trees, depth, lb_bias
+    intermediate_parallel, bias_parallel, load_balancing_bias, master_node_width, parallel_trees, depth, lb_bias
 ):
 
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
@@ -202,6 +206,7 @@ def apply_custom_fff_activation(
         decision_map = torch.zeros_like(
             decisions, dtype=torch.bfloat16, device=intermediate_parallel.device
         )  # (batch_size, parallel_size, n_nodes)
+        update_sign = torch.zeros((decision_map.size(1), decision_map.size(2)), dtype=torch.bfloat16)
         decision_map.scatter_(
             dim=2, index=current_nodes.unsqueeze(-1), value=1.0
         )  # set the first node to 1
@@ -211,6 +216,12 @@ def apply_custom_fff_activation(
             moves = torch.gather(decisions, 2, current_nodes.unsqueeze(2)).squeeze(2)
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
+            moves[moves==0] = -1
+            for item_current_nodes, item_moves in zip(current_nodes, moves.to(torch.bfloat16)):
+                # Assuming item_current_nodes and item_moves are 1D tensors
+                parallel_trees = torch.arange(len(item_current_nodes))  # Create an index for parallel_tree
+                # Perform the update in a vectorized way
+                update_sign[parallel_trees, item_current_nodes] += item_moves
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1, 2)

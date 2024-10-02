@@ -230,5 +230,5 @@ def apply_custom_fff_activation(
     flatten_intermediate = flatten_intermediate * decision_map
     return (
         flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1),
-        update_sign,
+        update_sign.view(-1),
     )

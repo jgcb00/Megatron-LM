@@ -121,7 +121,7 @@ class FastMLP(MegatronModule):
         )
 
         self.update_rate = update_rate
-        self.lb_bias = torch.nn.Parameter(torch.zeros((ffn_hidden_size,)), requires_grad=False, device='cuda', dtype=torch.bfloat16)
+        self.lb_bias = torch.nn.Parameter(torch.zeros((ffn_hidden_size,)), requires_grad=False)
         self.update_sign = None
 
     def forward(self, hidden_states):

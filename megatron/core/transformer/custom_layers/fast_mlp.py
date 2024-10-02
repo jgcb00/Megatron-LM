@@ -123,15 +123,16 @@ class FastMLP(MegatronModule):
         self.update_rate = update_rate
         self.lb_bias = torch.nn.Parameter(torch.zeros((ffn_hidden_size,)), requires_grad=False)
         self.update_sign = None
+        self.work = None
 
     def forward(self, hidden_states):
         # Here we take the assumptions of the leonardo booster node that have 4 GPUs
         # Meaning we will try one binary tree per GPU
-        if self.update_sign is not None:
-            self.update_sign.wait()
+        if self.work is not None:
+            self.work.wait()
             self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
             self.lb_bias += self.update_rate * self.update_sign
-            self.update_sign = None
+            self.work = None
     
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
@@ -143,7 +144,8 @@ class FastMLP(MegatronModule):
             self.parallel_trees_by_gpu,
             self.depth,
         )
-        self.update_sign = dist.all_reduce(update_sign, op=dist.ReduceOp.SUM, async_op=True)
+        self.update_sign = update_sign
+        self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
         if self.visualisation:
             with torch.no_grad():
                 self.usage.to(mask.device)

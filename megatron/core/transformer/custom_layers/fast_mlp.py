@@ -13,9 +13,8 @@ from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.training import get_args
-
 from .fast_mlp_visualisation import fffn2picture
-
+import time
 
 @dataclass
 class FastMLPSubmodules:
@@ -129,18 +128,18 @@ class FastMLP(MegatronModule):
         # Here we take the assumptions of the leonardo booster node that have 4 GPUs
         # Meaning we will try one binary tree per GPU
         if self.work is not None:
-            print("Waiting work")
+            time1 = time.time()
             self.work.wait()
-            print("Waiting done")
-            print(self.update_sign)
+            print("Wait time: ", time.time() - time1)
             self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
             print(self.update_sign)
-            self.lb_bias += self.update_rate * self.update_sign
+            self.lb_bias.add(self.update_rate * self.update_sign)
             print(self.lb_bias)
             self.work = None
     
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
+        start = time.time()
         intermediate_parallel, update_sign = apply_custom_fff_activation(
             intermediate_parallel,
             bias_parallel,
@@ -149,6 +148,7 @@ class FastMLP(MegatronModule):
             self.parallel_trees_by_gpu,
             self.depth,
         )
+        print(f"Activation time: {time.time() - start}")
         self.update_sign = update_sign
         self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
         if self.visualisation:

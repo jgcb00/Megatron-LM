@@ -128,9 +128,13 @@ class FastMLP(MegatronModule):
         # Here we take the assumptions of the leonardo booster node that have 4 GPUs
         # Meaning we will try one binary tree per GPU
         if self.update_sign is not None:
+            print("Updating the sign")
             self.update_sign.wait()
+            print(self.update_sign)
             self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
+            print(self.update_sign)
             self.lb_bias += self.update_rate * self.update_sign
+            print(self.lb_bias)
             self.update_sign = None
     
         # [s, b, 4 * h/p]
@@ -142,7 +146,6 @@ class FastMLP(MegatronModule):
             self.master_node_width_by_parallel_tree,
             self.parallel_trees_by_gpu,
             self.depth,
-            self.lb_bias,
         )
         self.update_sign = dist.all_reduce(update_sign, op=dist.ReduceOp.SUM, async_op=True)
         if self.visualisation:
@@ -178,12 +181,12 @@ class FastMLP(MegatronModule):
 
 
 def apply_custom_fff_activation(
-    intermediate_parallel, bias_parallel, load_balancing_bias, master_node_width, parallel_trees, depth, lb_bias
+    intermediate_parallel, bias_parallel, load_balancing_bias, master_node_width, parallel_trees, depth
 ):
 
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
     logit_decisions = (
-        (flatten_intermediate + bias_parallel + lb_bias.unsqueeze(0)) > 0
+        (flatten_intermediate + bias_parallel + load_balancing_bias.unsqueeze(0)) > 0
     ).long()  # (batch_size, parallel_size * n_nodes + master_node_size)
 
     # Perfectly balanced nodes have a current load of 0

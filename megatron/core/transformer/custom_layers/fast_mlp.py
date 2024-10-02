@@ -132,9 +132,9 @@ class FastMLP(MegatronModule):
             self.work.wait()
             print("Wait time: ", time.time() - time1)
             self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
-            print(self.update_sign)
-            self.lb_bias.add(self.update_rate * self.update_sign)
-            print(self.lb_bias)
+            print("Update sign : ", self.update_sign)
+            self.lb_bias = self.lb_bias + self.update_rate * self.update_sign
+            print("lb_bias :", self.lb_bias)
             self.work = None
     
         # [s, b, 4 * h/p]

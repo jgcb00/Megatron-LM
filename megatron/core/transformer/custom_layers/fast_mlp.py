@@ -128,13 +128,9 @@ class FastMLP(MegatronModule):
         # Here we take the assumptions of the leonardo booster node that have 4 GPUs
         # Meaning we will try one binary tree per GPU
         if self.update_sign is not None:
-            print("Updating the sign")
             self.update_sign.wait()
-            print(self.update_sign)
             self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
-            print(self.update_sign)
             self.lb_bias += self.update_rate * self.update_sign
-            print(self.lb_bias)
             self.update_sign = None
     
         # [s, b, 4 * h/p]

@@ -205,7 +205,7 @@ def apply_custom_fff_activation(
         decision_map = torch.zeros_like(
             decisions, dtype=torch.bfloat16, device=intermediate_parallel.device
         )  # (batch_size, parallel_size, n_nodes)
-        update_sign = torch.zeros((decision_map.size(1), decision_map.size(2)), dtype=torch.bfloat16)
+        update_sign = torch.zeros((decision_map.size(1), decision_map.size(2)), dtype=torch.bfloat16, device=intermediate_parallel.device)
         decision_map.scatter_(
             dim=2, index=current_nodes.unsqueeze(-1), value=1.0
         )  # set the first node to 1

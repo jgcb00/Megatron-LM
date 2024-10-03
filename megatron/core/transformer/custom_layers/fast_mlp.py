@@ -162,7 +162,6 @@ class FastMLP(MegatronModule):
             self.depth,
         )
         if self.training:
-            print("Update sign")
             self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
             self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
         if self.visualisation:

@@ -237,7 +237,7 @@ def apply_custom_fff_activation(
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = 1.0
-        cum_sum = decision_map.sum(dim=0).view(batch_size, -1)
+        cum_sum = decision_map.view(batch_size, -1).sum(dim=0)
 
         decision_map = decision_map.flatten(1, 2)
 

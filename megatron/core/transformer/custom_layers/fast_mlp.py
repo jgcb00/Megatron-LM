@@ -146,18 +146,13 @@ class FastMLP(MegatronModule):
         # Here we take the assumptions of the leonardo booster node that have 4 GPUs
         # Meaning we will try one binary tree per GPU
         if self.work is not None:
-            time1 = time.time()
             self.work.wait()
-            print("Wait time: ", time.time() - time1)
             self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
-            print("Update sign : ", self.update_sign)
             self.lb_bias.data = self.lb_bias.data + self.update_rate * self.update_sign
-            print("lb_bias :", self.lb_bias.data)
             self.work = None
     
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
-        start = time.time()
         intermediate_parallel, cum_decision_map = apply_custom_fff_activation(
             intermediate_parallel,
             bias_parallel,
@@ -168,9 +163,7 @@ class FastMLP(MegatronModule):
         )
         
         self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
-        print("Update sign : ", self.update_sign.shape)
         self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
-        print(f"Activation time: {time.time() - start}")
         if self.visualisation:
             with torch.no_grad():
                 self.usage.to(mask.device)
@@ -240,8 +233,6 @@ def apply_custom_fff_activation(
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = 1.0
         cum_sum = decision_map.view(batch_size, -1).sum(dim=0)
-        print("Cum sum: ", cum_sum.shape)
-
         decision_map = decision_map.flatten(1, 2)
 
     flatten_intermediate = flatten_intermediate * decision_map

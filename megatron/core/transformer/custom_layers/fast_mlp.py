@@ -21,7 +21,7 @@ import time
 class FastMLPSubmodules:
     linear_fc1: Union[ModuleSpec, type] = None
     linear_fc2: Union[ModuleSpec, type] = None
-    parallel_trees: Optional[int] = 4
+    parallel_trees: Optional[int] = 8
     master_node: Optional[bool] = True
     master_node_width: Optional[int] = None
     load_balancing_update_rate: Optional[float] = 1e-3
@@ -113,7 +113,7 @@ class FastMLP(MegatronModule):
             self.input_size,
             config=self.config,
             init_method=self.config.output_layer_init_method,
-            bias=False,  # self.config.add_bias_linear,
+            bias=True,  # self.config.add_bias_linear,
             input_is_parallel=True,  # Probably should be False
             skip_bias_add=True,
             is_expert=is_expert,  # False

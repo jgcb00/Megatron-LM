@@ -96,7 +96,7 @@ class FastMLP(MegatronModule):
                 torch.nn.init.uniform_, a=-init_k, b=init_k
             ),  # will probably have to update this
             gather_output=False,
-            bias=True,  # self.config.add_bias_linear,
+            bias=False,  # self.config.add_bias_linear,
             skip_bias_add=True,
             is_expert=is_expert,  # false
             tp_comm_buffer_name='fc1',
@@ -131,7 +131,7 @@ class FastMLP(MegatronModule):
                     for d in range(depth - 1)
                 )
             )
-        ).unsqueeze(0).expand(self.parallel_trees, -1) + (torch.arange(self.parallel_trees) * 2**depth -1 ).unsqueeze(1)
+        ).unsqueeze(0).expand(self.parallel_trees, -1) + (torch.arange(self.parallel_trees) * ((2**depth -1) + self.master_node_width_by_parallel_tree) ).unsqueeze(1)
 
         right_children = left_children + 1
 

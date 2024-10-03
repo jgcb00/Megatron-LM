@@ -201,9 +201,12 @@ def apply_custom_fff_activation(
 ):
 
     flatten_intermediate = intermediate_parallel.view(-1, intermediate_parallel.size(-1))
-    logit_decisions = (
-        (flatten_intermediate + bias_parallel + load_balancing_bias.unsqueeze(0)) > 0
-    ).long()  # (batch_size, parallel_size * n_nodes + master_node_size)
+    if bias_parallel is not None:
+        logit_decisions = (
+            (flatten_intermediate + bias_parallel + load_balancing_bias.unsqueeze(0)) > 0
+        ).long()  # (batch_size, parallel_size * n_nodes + master_node_size)
+    else:
+        logit_decisions = ((flatten_intermediate + load_balancing_bias.unsqueeze(0)) > 0).long()
 
     logit_decisions = logit_decisions.view(
         -1, parallel_trees, 2**depth - 1 + master_node_width

@@ -96,7 +96,7 @@ class FastMLP(MegatronModule):
                 torch.nn.init.uniform_, a=-init_k, b=init_k
             ),  # will probably have to update this
             gather_output=False,
-            bias=False,  # self.config.add_bias_linear,
+            bias=True,  # self.config.add_bias_linear,
             skip_bias_add=True,
             is_expert=is_expert,  # false
             tp_comm_buffer_name='fc1',
@@ -113,7 +113,7 @@ class FastMLP(MegatronModule):
             self.input_size,
             config=self.config,
             init_method=self.config.output_layer_init_method,
-            bias=True,  # self.config.add_bias_linear,
+            bias=False,  # self.config.add_bias_linear,
             input_is_parallel=True,  # Probably should be False
             skip_bias_add=True,
             is_expert=is_expert,  # False

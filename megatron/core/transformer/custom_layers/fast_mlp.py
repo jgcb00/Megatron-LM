@@ -24,6 +24,7 @@ class FastMLPSubmodules:
     parallel_trees: Optional[int] = 4
     master_node: Optional[bool] = True
     master_node_width: Optional[int] = None
+    load_balancing_update_rate: Optional[float] = 1e-3
 
 
 class FastMLP(MegatronModule):
@@ -49,7 +50,6 @@ class FastMLP(MegatronModule):
         submodules: FastMLPSubmodules,
         is_expert: bool = False,
         input_size: int = None,
-        update_rate: float = 1e-3,
     ):
         super().__init__(config=config)
         args = get_args()
@@ -120,7 +120,7 @@ class FastMLP(MegatronModule):
             tp_comm_buffer_name='fc2',
         )
 
-        self.update_rate = update_rate
+        self.update_rate = submodules.load_balancing_update_rate
         self.lb_bias = torch.nn.Parameter(torch.zeros((ffn_hidden_size,)), requires_grad=False)
         self.update_sign = None
         self.work = None
@@ -161,9 +161,9 @@ class FastMLP(MegatronModule):
             self.parallel_trees_by_gpu,
             self.depth,
         )
-        
-        self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
-        self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
+        if self.training:
+            self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
+            self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
         if self.visualisation:
             with torch.no_grad():
                 self.usage.to(mask.device)

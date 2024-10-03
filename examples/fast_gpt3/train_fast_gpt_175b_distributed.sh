@@ -15,6 +15,13 @@ TENSORBOARD_LOGS_PATH=$2 #<Specify path>
 VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
 DATA_PATH=$4 #<Specify path and file prefix>_text_document
 
+# Calculate the number of workers
+num_workers=$((GPUS_PER_NODE * 8))
+
+# Apply the maximum limit of 16
+if [ "$num_workers" -gt 16 ]; then
+  num_workers=16
+fi
 
 echo "Master Address : "$MASTER_ADDR" | "$NUM_NODES" Nodes | World Size : "$WORLD_SIZE
 
@@ -38,8 +45,8 @@ GPT_MODEL_ARGS=(
 )
 
 TRAINING_ARGS=(
-    --num-workers 16
-    --micro-batch-size 6 
+    --num-workers $num_workers
+    --micro-batch-size 5 
     --train-samples 12207050 
     --weight-decay 0.1 
     --adam-beta1 0.9 
@@ -85,7 +92,7 @@ EVAL_AND_LOGGING_ARGS=(
     --log-throughput
 )
 
-srun torchrun ${DISTRIBUTED_ARGS[@]} ../../Megatron-LM/pretrain_fastgpt.py \
+srun torchrun ${DISTRIBUTED_ARGS[@]} ../../megatron_lb/pretrain_fastgpt.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

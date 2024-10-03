@@ -214,7 +214,7 @@ def apply_custom_fff_activation(
     if bias_parallel is not None:
         flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
     else:
-        flatten_intermediate = bias_gelu_impl(flatten_intermediate, torch.tensor([0]))
+        flatten_intermediate = bias_gelu_impl(flatten_intermediate, torch.zeros((flatten_intermediate.shape[-1]), device=flatten_intermediate.device, dtype=flatten_intermediate.dtype))
     batch_size = flatten_intermediate.size(0)
 
     decisions = logit_decisions.view(

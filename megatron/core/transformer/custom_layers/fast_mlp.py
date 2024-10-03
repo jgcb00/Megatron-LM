@@ -161,7 +161,7 @@ class FastMLP(MegatronModule):
             self.parallel_trees_by_gpu,
             self.depth,
         )
-        if self.training:
+        if self.training and self.work is None:
             self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
             self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
         if self.visualisation:

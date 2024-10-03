@@ -21,10 +21,10 @@ import time
 class FastMLPSubmodules:
     linear_fc1: Union[ModuleSpec, type] = None
     linear_fc2: Union[ModuleSpec, type] = None
-    parallel_trees: Optional[int] = 16
+    parallel_trees: Optional[int] = 4
     master_node: Optional[bool] = True
     master_node_width: Optional[int] = None
-    load_balancing_update_rate: Optional[float] = 1e-3
+    load_balancing_update_rate: Optional[float] = 1e-4
 
 
 class FastMLP(MegatronModule):
@@ -147,7 +147,7 @@ class FastMLP(MegatronModule):
         # Meaning we will try one binary tree per GPU
         if self.work is not None:
             self.work.wait()
-            #self.update_sign[(self.update_sign > -50) & (self.update_sign < 50)] = 0
+            self.update_sign[(self.update_sign > -50) & (self.update_sign < 50)] = 0
             self.update_sign = -torch.clamp(self.update_sign, min=-1, max=1)
             self.lb_bias.data = self.lb_bias.data + self.update_rate * self.update_sign
             self.work = None

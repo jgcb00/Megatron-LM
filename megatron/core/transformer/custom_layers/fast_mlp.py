@@ -138,8 +138,8 @@ class FastMLP(MegatronModule):
 
         leave_fake_children = torch.zeros((self.parallel_trees, 2 ** (depth - 1) + self.master_node_width_by_parallel_tree), dtype=torch.long)
 
-        self.left_children = torch.cat([left_children, leave_fake_children], dim=1)
-        self.right_children = torch.cat([right_children, leave_fake_children], dim=1)
+        self.left_children = torch.cat([left_children, leave_fake_children], dim=1).view(-1)
+        self.right_children = torch.cat([right_children, leave_fake_children], dim=1).view(-1)
 
 
     def forward(self, hidden_states):
@@ -166,6 +166,7 @@ class FastMLP(MegatronModule):
             self.parallel_trees_by_gpu,
             self.depth,
         )
+        
         self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
         print("Update sign : ", self.update_sign.shape)
         self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)

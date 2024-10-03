@@ -167,6 +167,7 @@ class FastMLP(MegatronModule):
             self.depth,
         )
         self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
+        print("Update sign : ", self.update_sign.shape)
         self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
         print(f"Activation time: {time.time() - start}")
         if self.visualisation:
@@ -238,6 +239,7 @@ def apply_custom_fff_activation(
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = 1.0
         cum_sum = decision_map.view(batch_size, -1).sum(dim=0)
+        print("Cum sum: ", cum_sum.shape)
 
         decision_map = decision_map.flatten(1, 2)
 

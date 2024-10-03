@@ -1,6 +1,7 @@
 # Copyright (c) 2024, NVIDIA CORPORATION. All rights reserved.
 
 from dataclasses import dataclass
+import itertools
 from typing import Optional, Tuple, Union
 from math import log2, ceil, sqrt
 import torch
@@ -123,6 +124,23 @@ class FastMLP(MegatronModule):
         self.lb_bias = torch.nn.Parameter(torch.zeros((ffn_hidden_size,)), requires_grad=False)
         self.update_sign = None
         self.work = None
+        left_children = torch.tensor(
+            list(
+                itertools.chain.from_iterable(
+                    [((2 ** d - 1) + n) * 2 + 1 for n in range(2**d)]
+                    for d in range(depth - 1)
+                )
+            )
+        ).unsqueeze(0).expand(self.parallel_trees, -1) + (torch.arange(self.parallel_trees) * 2**depth -1 ).unsqueeze(1)
+
+        right_children = left_children + 1
+
+
+        leave_fake_children = torch.zeros((self.parallel_trees, 2 ** (depth - 1) + self.master_node_width_by_parallel_tree), dtype=torch.long)
+
+        self.left_children = torch.cat([left_children, leave_fake_children], dim=1)
+        self.right_children = torch.cat([right_children, leave_fake_children], dim=1)
+
 
     def forward(self, hidden_states):
         # Here we take the assumptions of the leonardo booster node that have 4 GPUs
@@ -140,7 +158,7 @@ class FastMLP(MegatronModule):
         # [s, b, 4 * h/p]
         intermediate_parallel, bias_parallel = self.linear_fc1(hidden_states)
         start = time.time()
-        intermediate_parallel, update_sign = apply_custom_fff_activation(
+        intermediate_parallel, cum_decision_map = apply_custom_fff_activation(
             intermediate_parallel,
             bias_parallel,
             self.lb_bias,
@@ -148,9 +166,9 @@ class FastMLP(MegatronModule):
             self.parallel_trees_by_gpu,
             self.depth,
         )
-        print(f"Activation time: {time.time() - start}")
-        self.update_sign = update_sign
+        self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
         self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
+        print(f"Activation time: {time.time() - start}")
         if self.visualisation:
             with torch.no_grad():
                 self.usage.to(mask.device)
@@ -192,10 +210,6 @@ def apply_custom_fff_activation(
         (flatten_intermediate + bias_parallel + load_balancing_bias.unsqueeze(0)) > 0
     ).long()  # (batch_size, parallel_size * n_nodes + master_node_size)
 
-    # Perfectly balanced nodes have a current load of 0
-    current_load = logit_decisions.sum(dim=0)  # parallel_size * n_nodes + master_node_size
-    update_sign = torch.where(current_load < 0.0, 1.0, -1.0)
-
     logit_decisions = logit_decisions.view(
         -1, parallel_trees, 2**depth - 1 + master_node_width
     )  # (batch_size, parallel_size, n_nodes)
@@ -212,7 +226,6 @@ def apply_custom_fff_activation(
         decision_map = torch.zeros_like(
             decisions, dtype=torch.bfloat16, device=intermediate_parallel.device
         )  # (batch_size, parallel_size, n_nodes)
-        update_sign = torch.zeros((decision_map.size(1), decision_map.size(2)), dtype=torch.bfloat16, device=intermediate_parallel.device)
         decision_map.scatter_(
             dim=2, index=current_nodes.unsqueeze(-1), value=1.0
         )  # set the first node to 1
@@ -222,12 +235,6 @@ def apply_custom_fff_activation(
             moves = torch.gather(decisions, 2, current_nodes.unsqueeze(2)).squeeze(2)
             next_nodes = (current_nodes - current_platform) * 2 + moves + next_platform
             decision_map.scatter_(2, next_nodes.unsqueeze(-1), 1.0)
-            moves[moves==0] = -1
-            for item_current_nodes, item_moves in zip(current_nodes, moves.to(torch.bfloat16)):
-                # Assuming item_current_nodes and item_moves are 1D tensors
-                parallel_trees = torch.arange(len(item_current_nodes))  # Create an index for parallel_tree
-                # Perform the update in a vectorized way
-                update_sign[parallel_trees, item_current_nodes] += item_moves
             current_nodes = next_nodes
         decision_map[:, :, -master_node_width:] = 1.0
         decision_map = decision_map.flatten(1, 2)
@@ -235,5 +242,5 @@ def apply_custom_fff_activation(
     flatten_intermediate = flatten_intermediate * decision_map
     return (
         flatten_intermediate.view(intermediate_parallel.size(0), intermediate_parallel.size(1), -1),
-        update_sign.view(-1),
+        decision_map.view(batch_size, -1).sum(dim=0)
     )

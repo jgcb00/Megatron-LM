@@ -211,7 +211,10 @@ def apply_custom_fff_activation(
     logit_decisions = logit_decisions.view(
         -1, parallel_trees, 2**depth - 1 + master_node_width
     )  # (batch_size, parallel_size, n_nodes)
-    flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
+    if bias_parallel is not None:
+        flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
+    else:
+        flatten_intermediate = bias_gelu_impl(flatten_intermediate, 0)
     batch_size = flatten_intermediate.size(0)
 
     decisions = logit_decisions.view(

@@ -21,7 +21,7 @@ import time
 class FastMLPSubmodules:
     linear_fc1: Union[ModuleSpec, type] = None
     linear_fc2: Union[ModuleSpec, type] = None
-    parallel_trees: Optional[int] = 8
+    parallel_trees: Optional[int] = 64
     master_node: Optional[bool] = True
     master_node_width: Optional[int] = None
     load_balancing_update_rate: Optional[float] = 1e-3

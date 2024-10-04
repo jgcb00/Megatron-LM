@@ -24,7 +24,7 @@ class FastMLPSubmodules:
     parallel_trees: Optional[int] = 4
     master_node: Optional[bool] = True
     master_node_width: Optional[int] = None
-    load_balancing_update_rate: Optional[float] = 1e-4
+    load_balancing_update_rate: Optional[float] = 1e-3
 
 
 class FastMLP(MegatronModule):
@@ -96,7 +96,7 @@ class FastMLP(MegatronModule):
                 torch.nn.init.uniform_, a=-init_k, b=init_k
             ),  # will probably have to update this
             gather_output=False,
-            bias=True,  # self.config.add_bias_linear,
+            bias=False,  # self.config.add_bias_linear,
             skip_bias_add=True,
             is_expert=is_expert,  # false
             tp_comm_buffer_name='fc1',

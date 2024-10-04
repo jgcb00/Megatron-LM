@@ -100,8 +100,6 @@ class FastMLP(MegatronModule):
             is_expert=is_expert,  # false
             tp_comm_buffer_name='fc1',
         )
-        if self.visualisation:
-            self.nb_tokens = 0
         self.activation_func = self.config.activation_func  # should be Gelu() F.gelu
 
         self.linear_fc2 = build_module(
@@ -138,6 +136,8 @@ class FastMLP(MegatronModule):
         self.left_children = torch.cat([left_children, leave_fake_children], dim=1).view(-1)
         self.right_children = torch.cat([right_children, leave_fake_children], dim=1).view(-1)
         self.eval_started = False
+        self.nb_tokens = 0
+
 
 
     def forward(self, hidden_states):

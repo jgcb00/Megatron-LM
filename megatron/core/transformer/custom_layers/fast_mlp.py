@@ -102,9 +102,7 @@ class FastMLP(MegatronModule):
             tp_comm_buffer_name='fc1',
         )
         if self.visualisation:
-            self.usage = torch.zeros(ffn_hidden_size, dtype=torch.int32, device='cuda')
             self.nb_tokens = 0
-            self.threshold = 1_000_000
         self.activation_func = self.config.activation_func  # should be Gelu() F.gelu
 
         self.linear_fc2 = build_module(
@@ -178,7 +176,7 @@ class FastMLP(MegatronModule):
             if dist.get_rank() == 0:
                 with torch.no_grad():
                     fffn2picture(
-                        self.usage,
+                        self.update_sign,
                         self.nb_tokens,
                         self.parallel_trees_by_gpu,
                         self.master_node_width_by_parallel_tree,

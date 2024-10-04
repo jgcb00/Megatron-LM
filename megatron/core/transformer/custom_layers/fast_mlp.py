@@ -53,7 +53,7 @@ class FastMLP(MegatronModule):
     ):
         super().__init__(config=config)
         args = get_args()
-        self.visualisation = True
+        self.visualisation = False
         tensor_model_parallel_size = args.tensor_model_parallel_size
         assert (
             submodules.parallel_trees % tensor_model_parallel_size == 0
@@ -161,11 +161,11 @@ class FastMLP(MegatronModule):
             self.depth,
         )
 
-        if self.eval_started is False and not self.training:
+        if self.visualisation and self.eval_started is False and not self.training:
             self.eval_started = True
             self.update_sign = torch.zeros_like(cum_decision_map)
             
-        if not self.training and self.eval_started:
+        if self.visualisation and not self.training and self.eval_started:
             self.update_sign += cum_decision_map
             self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
 

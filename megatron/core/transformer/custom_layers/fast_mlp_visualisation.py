@@ -119,7 +119,7 @@ def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_
     args = get_args()
     path = args.save
     print(matrix)
-    matrix = matrix.cpu().numpy()
+    matrix = matrix.to(torch.int32).cpu().numpy()
     print(matrix)
     for idx, tree in enumerate(matrix):
         root, max_activation = matrix_to_binary_tree(tree, number_of_tokens)
@@ -127,7 +127,7 @@ def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_
             tree = tree / number_of_tokens
             pretty_number_of_tokens = f"{number_of_tokens/10**9:.1f}B" if number_of_tokens >= 10**9 else f"{number_of_tokens/10**6:.2f}M"
             path = args.save + f"/{id_matrix}_{idx}_{pretty_number_of_tokens}.png"
-            plot_binary_tree(root, tree, max_activation, path)
+            plot_binary_tree(root, tree, max_activation, number_of_tokens,  path)
             print(f"ID: {id_matrix} Tree {idx} done for {number_of_tokens:,} tokens")
         else:
             print(f"ID: {id_matrix} Tree {idx} is empty, skipping visualization")

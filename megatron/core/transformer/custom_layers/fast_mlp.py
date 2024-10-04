@@ -161,28 +161,30 @@ class FastMLP(MegatronModule):
             self.depth,
         )
 
-        if self.visualisation and self.eval_started is False and not self.training:
+        if self.eval_started is False and not self.training:
             self.eval_started = True
             self.update_sign = torch.zeros_like(cum_decision_map)
             
-        if self.visualisation and not self.training and self.eval_started:
+        if not self.training and self.eval_started:
             self.update_sign += cum_decision_map
             self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
 
-        if self.visualisation and self.eval_started and self.training:
+        if self.eval_started and self.training:
             #Meaning end of the evaluation
             self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM)
             if dist.get_rank() == 0:
-                world_size = dist.get_world_size()
-                self.nb_tokens = self.nb_tokens * world_size
-                with torch.no_grad():
-                    fffn2picture(
-                        self.update_sign,
-                        self.nb_tokens,
-                        self.parallel_trees_by_gpu,
-                        self.master_node_width_by_parallel_tree,
-                        hash(self),
-                    )
+                print(self.update_sign)
+                if self.visualisation :
+                    world_size = dist.get_world_size()
+                    self.nb_tokens = self.nb_tokens * world_size
+                    with torch.no_grad():
+                        fffn2picture(
+                            self.update_sign,
+                            self.nb_tokens,
+                            self.parallel_trees_by_gpu,
+                            self.master_node_width_by_parallel_tree,
+                            hash(self),
+                        )
             self.nb_tokens = 0
             self.eval_started = False
                     

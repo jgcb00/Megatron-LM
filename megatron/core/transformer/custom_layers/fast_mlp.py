@@ -21,10 +21,10 @@ import time
 class FastMLPSubmodules:
     linear_fc1: Union[ModuleSpec, type] = None
     linear_fc2: Union[ModuleSpec, type] = None
-    parallel_trees: Optional[int] = 4
+    parallel_trees: Optional[int] = 8
     master_node: Optional[bool] = True
     master_node_width: Optional[int] = None
-    load_balancing_update_rate: Optional[float] = 1e-4
+    load_balancing_update_rate: Optional[float] = 1e-3
 
 
 class FastMLP(MegatronModule):
@@ -53,7 +53,7 @@ class FastMLP(MegatronModule):
     ):
         super().__init__(config=config)
         args = get_args()
-        self.visualisation = False
+        self.visualisation = True
         tensor_model_parallel_size = args.tensor_model_parallel_size
         assert (
             submodules.parallel_trees % tensor_model_parallel_size == 0
@@ -140,6 +140,7 @@ class FastMLP(MegatronModule):
 
         self.left_children = torch.cat([left_children, leave_fake_children], dim=1).view(-1)
         self.right_children = torch.cat([right_children, leave_fake_children], dim=1).view(-1)
+        self.eval_started = False
 
 
     def forward(self, hidden_states):
@@ -147,7 +148,7 @@ class FastMLP(MegatronModule):
         # Meaning we will try one binary tree per GPU
         if self.work is not None:
             self.work.wait()
-            # self.update_sign[(self.update_sign > -50) & (self.update_sign < 50)] = 0
+            self.update_sign[(self.update_sign > -50) & (self.update_sign < 50)] = 0
             self.update_sign = torch.clamp(self.update_sign, min=-1, max=1)
             self.lb_bias.data = self.lb_bias.data + self.update_rate * self.update_sign
             self.work = None
@@ -162,17 +163,20 @@ class FastMLP(MegatronModule):
             self.parallel_trees_by_gpu,
             self.depth,
         )
-        if self.training and self.work is None:
-            self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
-            self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
-        if self.visualisation:
-            with torch.no_grad():
-                self.usage.to(mask.device)
-                print(mask)
-                self.usage += mask
-                self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
-                if self.nb_tokens > self.threshold:
-                    self.threshold += 200_000_000
+
+        if self.eval_started is False and not self.training:
+            self.eval_started = True
+            self.update_sign = torch.zeros_like(cum_decision_map)
+            
+        if not self.training and self.eval_started:
+            self.update_sign += cum_decision_map
+            self.nb_tokens += hidden_states.size(0) * hidden_states.size(1)
+
+        if self.visualisation and self.eval_started and self.training:
+            #Meaning end of the evaluation
+            self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM)
+            if dist.get_rank() == 0:
+                with torch.no_grad():
                     fffn2picture(
                         self.usage,
                         self.nb_tokens,
@@ -180,8 +184,12 @@ class FastMLP(MegatronModule):
                         self.master_node_width_by_parallel_tree,
                         hash(self),
                     )
-                    self.usage.zero_()
-                    self.nb_tokens = 0
+            self.nb_tokens = 0
+            self.eval_started = False
+                    
+        if self.training and self.work is None:
+            self.update_sign = cum_decision_map[self.left_children] - cum_decision_map[self.right_children]
+            self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM, async_op=True)
         # [s, b, h]
         output, output_bias = self.linear_fc2(intermediate_parallel)
 

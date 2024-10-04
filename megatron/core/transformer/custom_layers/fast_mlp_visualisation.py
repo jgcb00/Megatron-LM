@@ -3,6 +3,7 @@ import networkx as nx
 from collections import deque
 import numpy as np
 import torch
+from megatron.training import get_args
 
 # Define the TreeNode class to store the activation count
 class TreeNode:
@@ -47,7 +48,7 @@ def matrix_to_binary_tree(matrix, number_of_tokens):
     
     return root, max_activation
 
-def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activated.png"):
+def plot_binary_tree(root, matrix, max_activation, number_of_tokens, file_name="binary_tree_activated.png"):
     def add_nodes_edges(node, x, y, level, G):
         if node:
             G.add_node(node, pos=(x, -y), activation=node.activation_count)
@@ -104,7 +105,7 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
     )
     
     plt.colorbar(nodes, ax=ax, label='Activation Count')
-    ax.set_title(f"Binary Tree Visualization\nNodes: {len(G)}, Max Activation: {max_activation:.2f}", fontsize=10)
+    ax.set_title(f"Nodes: {len(G)}, tokens: {number_of_tokens}\nmax : {max_activation:.2f}", fontsize=10)
     ax.axis('off')
     
     plt.tight_layout()
@@ -115,6 +116,8 @@ def plot_binary_tree(root, matrix, max_activation, file_name="binary_tree_activa
 def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_tree, id_matrix):
     matrix = matrix.view(number_of_tree, -1)
     matrix = matrix[:, :-width_master_node_by_tree]
+    args = get_args()
+    path = args.save
     print(matrix)
     matrix = matrix.cpu().numpy()
     print(matrix)
@@ -123,7 +126,8 @@ def fffn2picture(matrix, number_of_tokens, number_of_tree, width_master_node_by_
         if root is not None:
             tree = tree / number_of_tokens
             pretty_number_of_tokens = f"{number_of_tokens/10**9:.1f}B" if number_of_tokens >= 10**9 else f"{number_of_tokens/10**6:.2f}M"
-            plot_binary_tree(root, tree, max_activation, f"{id_matrix}_{idx}_{pretty_number_of_tokens}.png")
+            path = args.save + f"/{id_matrix}_{idx}_{pretty_number_of_tokens}.png"
+            plot_binary_tree(root, tree, max_activation, path)
             print(f"ID: {id_matrix} Tree {idx} done for {number_of_tokens:,} tokens")
         else:
             print(f"ID: {id_matrix} Tree {idx} is empty, skipping visualization")

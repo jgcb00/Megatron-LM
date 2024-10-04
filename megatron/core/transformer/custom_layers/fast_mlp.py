@@ -71,7 +71,6 @@ class FastMLP(MegatronModule):
         elif submodules.master_node_width is None:
             submodules.master_node_width = 0
 
-        # The fused kernel multiplies the hidden size by 4, so we need to divide by 4
         ffn_hidden_size = int(
             (2**depth - 1) * submodules.parallel_trees + submodules.master_node_width
         )
@@ -146,7 +145,7 @@ class FastMLP(MegatronModule):
         # Meaning we will try one binary tree per GPU
         if self.work is not None:
             self.work.wait()
-            self.update_sign[(self.update_sign > -50) & (self.update_sign < 50)] = 0
+            # self.update_sign[(self.update_sign > -5) & (self.update_sign < 5)] = 0
             self.update_sign = torch.clamp(self.update_sign, min=-1, max=1)
             self.lb_bias.data = self.lb_bias.data + self.update_rate * self.update_sign
             self.work = None
@@ -174,6 +173,8 @@ class FastMLP(MegatronModule):
             #Meaning end of the evaluation
             self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM)
             if dist.get_rank() == 0:
+                world_size = dist.get_world_size()
+                self.nb_tokens = self.nb_tokens * world_size
                 with torch.no_grad():
                     fffn2picture(
                         self.update_sign,

@@ -173,6 +173,7 @@ class FastMLP(MegatronModule):
             #Meaning end of the evaluation
             self.work = dist.all_reduce(self.update_sign, op=dist.ReduceOp.SUM)
             if dist.get_rank() == 0:
+                self.update_sign = self.update_sign.view(self.parallel_trees, -1)
                 print(self.update_sign)
                 if self.visualisation :
                     world_size = dist.get_world_size()

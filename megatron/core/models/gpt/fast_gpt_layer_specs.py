@@ -144,7 +144,6 @@ def _get_fast_mlp_module_spec(
         submodules=FastMLPSubmodules(
             linear_fc1=TELayerNormColumnParallelLinear if use_te else ColumnParallelLinear,
             linear_fc2=TERowParallelLinear if use_te else RowParallelLinear,
-            parallel_trees=4,
             master_node=True,
         ),
     )

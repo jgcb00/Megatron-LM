@@ -67,7 +67,7 @@ class MLP(MegatronModule):
         self.linear_fc1 = build_module(
             submodules.linear_fc1,
             self.input_size,
-            512,
+            self.config.ffn_hidden_size,
             config=self.config,
             init_method=self.config.init_method,
             gather_output=False,
@@ -81,7 +81,7 @@ class MLP(MegatronModule):
 
         self.linear_fc2 = build_module(
             submodules.linear_fc2,
-            512,
+            self.config.ffn_hidden_size,
             self.config.hidden_size,
             config=self.config,
             init_method=self.config.output_layer_init_method,

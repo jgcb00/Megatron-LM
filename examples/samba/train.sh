@@ -36,13 +36,19 @@ DISTRIBUTED_ARGS=(
 )
 
 GPT_MODEL_ARGS=(
-    --num-layers 16 
+    --num-layers 8 
     --hidden-size 2048 
-    --num-attention-heads 8 
+    --num-attention-heads 16 
     --seq-length 4096 
     --max-position-embeddings 4096
-    --normalization RMSNorm
     --seed 42
+    --spec megatron.core.models.samba.samba_layer_specs samba_stack_spec
+    --normalization RMSNorm
+    --group-query-attention
+    --num-query-groups 8
+    --use-mcore-models
+    --no-create-attention-mask-in-dataloader
+    --sliding-window-attention 2048
 )
 
 TRAINING_ARGS=(
@@ -62,9 +68,6 @@ TRAINING_ARGS=(
     #--lr-decay-iters 430000 
     --use-flash-attn
     #--use-distributed-optimizer
-    --sequence-parallel
-    #--overlap-param-gather
-    #--overlap-grad-reduce
 
 )
 
@@ -96,7 +99,7 @@ EVAL_AND_LOGGING_ARGS=(
     --log-throughput
 )
 
-srun torchrun ${DISTRIBUTED_ARGS[@]} ../../megatron_lb/pretrain_fastgpt.py \
+srun torchrun ${DISTRIBUTED_ARGS[@]} ../../Megatron-LM/pretrain_samba.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

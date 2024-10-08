@@ -127,7 +127,7 @@ class SambaStack(MegatronModule):
         num_layers_per_pipeline_rank = self.config.num_layers
         if parallel_state.get_pipeline_model_parallel_world_size() > 1:
             pp_layer_offset, num_layers_per_pipeline_rank = self._select_layers_for_pipeline_parallel()
-
+        print("number of layer : ", num_layers_per_pipeline_rank)
         self.layers = nn.ModuleList()
         for _ in range(num_layers_per_pipeline_rank):
             layer = build_module(

@@ -690,6 +690,7 @@ def core_transformer_config_from_args(args, config_class=None):
     else:
         kw_args['num_query_groups'] = None
     kw_args['config_logger_dir'] = args.config_logger_dir
+    kw_args['window_size'] = (args.sliding_window_attention, 0)
 
     # Return config.
     return config_class(**kw_args)
@@ -724,6 +725,8 @@ def _add_transformer_engine_args(parser):
     group.add_argument('--fp8-param-gather', action='store_true',
                        help='Keep the compute param in fp8 (do not use any other intermediate '
                             'dtype) and perform the param all-gather in fp8.')
+    group.add_argument('--sliding-window-attention', type=int, default=-1, 
+                       help='Sliding window size for attention')
 
     return parser
 

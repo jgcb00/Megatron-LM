@@ -58,13 +58,13 @@ def model_provider(pre_process=True, post_process=True) -> SambaModel:
     assert args.use_legacy_models == False, "Mamba only supported in Mcore!"
 
     if args.spec is not None:
-        mamba_stack_spec = import_module(args.spec)
+        samba_stack_spec = import_module(args.spec)
     else:
         raise("You must provide a valid Mamba layer spec!")
 
     model = SambaModel(
         config=config,
-        mamba_stack_spec=mamba_stack_spec,
+        samba_stack_spec=samba_stack_spec,
         vocab_size=args.padded_vocab_size,
         max_sequence_length=args.max_position_embeddings,
         pre_process=pre_process,

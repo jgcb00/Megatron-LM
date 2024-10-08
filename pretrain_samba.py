@@ -142,7 +142,7 @@ def loss_func(loss_mask: torch.Tensor, output_tensor: torch.Tensor):
     )
 
 
-def forward_step(data_iterator, model: MambaModel):
+def forward_step(data_iterator, model: SambaModel):
     """Forward training step.
 
     Args:

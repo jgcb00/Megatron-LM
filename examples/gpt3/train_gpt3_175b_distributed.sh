@@ -37,7 +37,7 @@ GPT_MODEL_ARGS=(
 
 TRAINING_ARGS=(
     --num-workers 16
-    --micro-batch-size 1
+    --micro-batch-size 5
     --train-samples 12207050 
     --weight-decay 0.1 
     --adam-beta1 0.9 
@@ -52,6 +52,10 @@ TRAINING_ARGS=(
     #--lr-decay-iters 430000 
     --use-flash-attn
     #--use-distributed-optimizer
+    --sequence-parallel
+    #--overlap-param-gather 
+    #--overlap-grad-reduce 
+    --normalization RMSNorm
 )
 
 MODEL_PARALLEL_ARGS=(

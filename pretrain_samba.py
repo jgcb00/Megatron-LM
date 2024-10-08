@@ -52,7 +52,7 @@ def model_provider(pre_process=True, post_process=True) -> SambaModel:
     """
     args = get_args()
 
-    print_rank_0('building Mamba model ...')
+    print_rank_0('building Samba model ...')
     config = core_transformer_config_from_args(get_args())
 
     assert args.use_legacy_models == False, "Mamba only supported in Mcore!"

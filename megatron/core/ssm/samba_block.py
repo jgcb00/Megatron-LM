@@ -124,6 +124,7 @@ class SambaStack(MegatronModule):
         self.input_tensor = None
 
         pp_layer_offset = 0
+        num_layers_per_pipeline_rank = self.config.num_layers
         if parallel_state.get_pipeline_model_parallel_world_size() > 1:
             pp_layer_offset, num_layers_per_pipeline_rank = self._select_layers_for_pipeline_parallel()
 

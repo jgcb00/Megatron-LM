@@ -7,6 +7,7 @@ from typing import Optional
 
 from megatron.core.optimizer import MegatronOptimizer
 from megatron.core.utils import log_single_rank
+from megatron.training import get_args
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +92,38 @@ class OptimizerParamScheduler:
                 'both override and ' 'use-checkpoint are set.'
             )
 
+        # Ademamix
+        args = get_args()
+        self.beta3 = args.ademamix_bata3
+        self.beta1 = args.adam_beta1
+        self.beta2 = args.adam_beta2
+        self.alpha = args.ademamix_alpha
+        self.total_steps = args.train_iters
+        self.model_optimizer = args.optimizer
+        print("Optimiser Param scheduler, total steps: ", self.total_steps)
+        assert self.total_steps is not None
+
+
         # Set the learning rate
         self.step(0)
         log_single_rank(logger, logging.INFO, f"> learning rate decay style: {self.lr_decay_style}")
+
+    def get_beta3(self) -> float:
+        return min(
+            math.exp(
+                math.log(self.beta1) * math.log(self.beta3)
+                /
+                ((1 - self.num_steps/self.total_steps) * math.log(self.beta3)
+                + self.num_steps/self.total_steps * math.log(self.beta1))
+                ),
+            self.beta3
+        )
+
+    def get_alpha(self) -> float:
+        return min(
+            self.num_steps/self.total_steps * self.alpha,
+            self.alpha
+        )
 
     def get_wd(self) -> float:
         """Weight decay incr functions"""
@@ -191,6 +221,9 @@ class OptimizerParamScheduler:
             new_lr = self.get_lr(param_group)
             param_group['lr'] = new_lr * param_group.get('lr_mult', 1.0)
             param_group['weight_decay'] = new_wd * param_group.get('wd_mult', 1.0)
+            if self.model_optimizer == "ademamix":
+                param_group['alpha'] = self.get_alpha()
+                param_group['betas'] = (self.beta1, self.beta2, self.get_beta3())
 
     def state_dict(self) -> dict:
         """Return the state dict."""

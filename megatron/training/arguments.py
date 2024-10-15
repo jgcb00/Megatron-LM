@@ -1037,6 +1037,12 @@ def _add_regularization_args(parser):
     group.add_argument('--adam-beta2', type=float, default=0.999,
                        help='Second coefficient for computing running averages '
                        'of gradient and its square')
+    group.add_argument('--ademamix-beta3', type=float, default=0.9999,
+                       help='Third coefficient for computing running averages '
+                        'of gradient and its square')
+    group.add_argument('--ademamix-alpha', type=float, default=8,
+                       help='Alpha coefficient for computing running averages '
+                        'of gradient and its square')
     group.add_argument('--adam-eps', type=float, default=1e-08,
                        help='Term added to the denominator to improve'
                        'numerical stability')
@@ -1229,7 +1235,7 @@ def _add_training_args(parser):
                        help='Enable bias only in the QKV linear layers',
                        dest='add_qkv_bias')
     group.add_argument('--optimizer', type=str, default='adam',
-                       choices=['adam', 'sgd'],
+                       choices=['adam', 'sgd', 'ademamix', 'muon'],
                        help='Optimizer function')
     group.add_argument('--dataloader-type', type=str, default=None,
                        choices=['single', 'cyclic', 'external'],

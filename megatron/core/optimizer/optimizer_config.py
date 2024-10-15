@@ -83,6 +83,12 @@ class OptimizerConfig:
 
     adam_eps: float = 1e-08
     """Term added to the denominator to improve numerical stability in Adam optimizer."""
+    
+    # Adamemix
+    adam_beta3 : float = 0.9999
+    """Third coefficient for computing running averages of gradient and its square in Adamemix"""
+    
+    adam_alpha : float = 8
 
     # SGD.
     sgd_momentum: float = 0.9

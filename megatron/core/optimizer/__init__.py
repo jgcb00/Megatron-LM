@@ -7,6 +7,7 @@ import torch
 try:
     from transformer_engine.pytorch.optimizers import FusedAdam as Adam
     from transformer_engine.pytorch.optimizers import FusedSGD as SGD
+    from transformer_engine.pytorch.optimizers import FusedAdemamix as Ademamix
 except ImportError:
     try:
         from apex.optimizers import FusedAdam as Adam
@@ -274,7 +275,22 @@ def _get_megatron_optimizer_based_on_param_groups(
                     if len(opt.state[p]) == 0:
                         opt.state[p]['exp_avg'] = torch.zeros_like(p.data)
                         opt.state[p]['exp_avg_sq'] = torch.zeros_like(p.data)
-
+    elif config.optimizer == 'ademamix':
+        optimizer = Ademamix(
+            param_groups,
+            lr=config.lr,
+            weight_decay=config.weight_decay,
+            betas=(config.adam_beta1, config.adam_beta2, config.adam_beta3),
+            alpha=config.adam_alpha,
+            eps=config.adam_eps,
+        )
+        def init_state_fn(opt):
+            for group in opt.param_groups:
+                for p in group['params']:
+                    if len(opt.state[p]) == 0:
+                        opt.state[p]['exp_avg_slow'] = torch.zeros_like(p.data)
+                        opt.state[p]['exp_avg_fast'] = torch.zeros_like(p.data)
+                        opt.state[p]['exp_avg_sq'] = torch.zeros_like(p.data)
     elif config.optimizer == 'sgd':
         optimizer = SGD(
             param_groups,

@@ -9,6 +9,7 @@ try:
     from transformer_engine.pytorch.optimizers import FusedSGD as SGD
     from transformer_engine.pytorch.optimizers import FusedAdemamix as Ademamix
 except ImportError:
+    warnings.warn("Transformer Engine is not installed. Ademamix will not be loaded.")
     try:
         from apex.optimizers import FusedAdam as Adam
         from apex.optimizers import FusedSGD as SGD

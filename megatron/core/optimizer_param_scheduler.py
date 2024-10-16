@@ -94,7 +94,7 @@ class OptimizerParamScheduler:
 
         # Ademamix
         args = get_args()
-        self.beta3 = args.ademamix_bata3
+        self.beta3 = args.ademamix_beta3
         self.beta1 = args.adam_beta1
         self.beta2 = args.adam_beta2
         self.alpha = args.ademamix_alpha

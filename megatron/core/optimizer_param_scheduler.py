@@ -100,6 +100,7 @@ class OptimizerParamScheduler:
         self.alpha = args.ademamix_alpha
         self.total_steps = args.train_iters
         self.model_optimizer = args.optimizer
+        self.global_batch_size = args.global_batch_size
         print("Optimiser Param scheduler, total steps: ", self.total_steps)
         assert self.total_steps is not None
 
@@ -113,15 +114,15 @@ class OptimizerParamScheduler:
             math.exp(
                 math.log(self.beta1) * math.log(self.beta3)
                 /
-                ((1 - self.num_steps/self.total_steps) * math.log(self.beta3)
-                + self.num_steps/self.total_steps * math.log(self.beta1))
+                ((1 - self.num_steps/self.global_batch_size/self.total_steps) * math.log(self.beta3)
+                + self.num_steps/self.global_batch_size/self.total_steps * math.log(self.beta1))
                 ),
             self.beta3
         )
 
     def get_alpha(self) -> float:
         return min(
-            self.num_steps/self.total_steps * self.alpha,
+            self.num_steps/self.global_batch_size/self.total_steps * self.alpha,
             self.alpha
         )
 
@@ -224,7 +225,7 @@ class OptimizerParamScheduler:
             if self.model_optimizer == "ademamix":
                 param_group['alpha'] = self.get_alpha()
                 param_group['betas'] = (self.beta1, self.beta2, self.get_beta3())
-            if self.model_optimizer == "ademamix" and self.num_steps % 100 == 0:
+            if self.model_optimizer == "ademamix" and self.num_steps/self.global_batch_size % 100 == 0:
                 print("Step: ", self.num_steps, " LR: ", new_lr, " WD: ", new_wd, " Beta3: ", self.get_beta3(), " Alpha: ", self.get_alpha())
 
     def state_dict(self) -> dict:

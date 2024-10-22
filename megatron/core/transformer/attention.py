@@ -5,6 +5,7 @@ from typing import Union
 
 import torch
 import math
+import copy
 
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.models.common.embeddings.rotary_pos_embedding import apply_rotary_pos_emb
@@ -85,11 +86,13 @@ class Attention(MegatronModule, ABC):
         self.num_attention_heads_per_partition = divide(self.config.num_attention_heads, world_size)
         self.num_query_groups_per_partition = divide(self.config.num_query_groups, world_size)
 
-        self.config.num_attention_heads = self.config.num_attention_heads // 2
-        self.config.num_query_groups = self.config.num_query_groups // 2
+        attention_config = copy.deepcopy(self.config)
+        attention_config.num_attention_heads = self.config.num_attention_heads // 2
+        attention_config.num_query_groups = self.config.num_query_groups // 2
+        attention_config.hidden_size = self.hidden_size_per_attention_head * attention_config.num_attention_heads
         self.core_attention = build_module(
             submodules.core_attention,
-            config=self.config,
+            config=attention_config,
             layer_number=self.layer_number,
             attn_mask_type=self.attn_mask_type,
             attention_type=self.attention_type,

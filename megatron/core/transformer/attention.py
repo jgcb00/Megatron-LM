@@ -85,6 +85,8 @@ class Attention(MegatronModule, ABC):
         self.num_attention_heads_per_partition = divide(self.config.num_attention_heads, world_size)
         self.num_query_groups_per_partition = divide(self.config.num_query_groups, world_size)
 
+        self.config.num_attention_heads = self.config.num_attention_heads // 2
+        self.config.num_query_groups = self.config.num_query_groups // 2
         self.core_attention = build_module(
             submodules.core_attention,
             config=self.config,

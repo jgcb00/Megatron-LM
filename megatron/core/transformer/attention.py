@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Union
 
 import torch
+import math
 
 from megatron.core import parallel_state, tensor_parallel
 from megatron.core.models.common.embeddings.rotary_pos_embedding import apply_rotary_pos_emb
@@ -501,6 +502,8 @@ class SelfAttention(Attention):
         return query, key, value
 
 
+
+
 class DiffSelfAttention(SelfAttention):
     """Differential Self-attention layer class
 
@@ -522,7 +525,7 @@ class DiffSelfAttention(SelfAttention):
             attn_mask_type=attn_mask_type,
         )
             
-        self.lambda_init = lambda_init_fn(layer_number)
+        self.lambda_init = 0.8 - 0.6 * math.exp(-0.3 * layer_number)
         head_dim = self.hidden_size_per_attention_head //2
         self.lambda_q1 = torch.nn.Parameter(torch.zeros(head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
         self.lambda_k1 = torch.nn.Parameter(torch.zeros(head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))

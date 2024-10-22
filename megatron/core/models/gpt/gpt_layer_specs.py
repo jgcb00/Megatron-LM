@@ -4,7 +4,7 @@ from typing import Optional
 
 from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
-from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
+from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules, DiffSelfAttention
 from megatron.core.transformer.dot_product_attention import DotProductAttention
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.identity_op import IdentityOp
@@ -70,7 +70,7 @@ def get_gpt_layer_with_transformer_engine_spec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
             self_attention=ModuleSpec(
-                module=SelfAttention,
+                module=DiffSelfAttention,
                 params={"attn_mask_type": AttnMaskType.causal},
                 submodules=SelfAttentionSubmodules(
                     linear_qkv=TELayerNormColumnParallelLinear,
@@ -114,7 +114,7 @@ def get_gpt_layer_local_spec(
         submodules=TransformerLayerSubmodules(
             input_layernorm=LNImpl,
             self_attention=ModuleSpec(
-                module=SelfAttention,
+                module=DiffSelfAttention,
                 params={"attn_mask_type": AttnMaskType.causal},
                 submodules=SelfAttentionSubmodules(
                     linear_qkv=ColumnParallelLinear,

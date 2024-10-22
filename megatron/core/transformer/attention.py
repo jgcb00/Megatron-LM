@@ -501,6 +501,191 @@ class SelfAttention(Attention):
         return query, key, value
 
 
+class DiffSelfAttention(SelfAttention):
+    """Differential Self-attention layer class
+
+    Self-attention layer takes input with size [s, b, h]
+    and returns output of the same size.
+    """
+
+    def __init__(
+        self,
+        config: TransformerConfig,
+        submodules: SelfAttentionSubmodules,
+        layer_number: int,
+        attn_mask_type=AttnMaskType.padding,
+    ):
+        super().__init__(
+            config=config,
+            submodules=submodules,
+            layer_number=layer_number,
+            attn_mask_type=attn_mask_type,
+        )
+            
+        self.lambda_init = lambda_init_fn(layer_number)
+        head_dim = self.hidden_size_per_attention_head //2
+        self.lambda_q1 = torch.nn.Parameter(torch.zeros(head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
+        self.lambda_k1 = torch.nn.Parameter(torch.zeros(head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
+        self.lambda_q2 = torch.nn.Parameter(torch.zeros(head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
+        self.lambda_k2 = torch.nn.Parameter(torch.zeros(head_dim, dtype=torch.float32).normal_(mean=0,std=0.1))
+
+    
+    def forward(
+        self,
+        hidden_states,
+        attention_mask,
+        key_value_states=None,
+        inference_params=None,
+        rotary_pos_emb=None,
+        packed_seq_params=None,
+    ):
+        # hidden_states: [sq, b, h]
+
+        # For self attention we just duplicate the rotary_pos_emb if it isn't already
+        if rotary_pos_emb is not None and not isinstance(rotary_pos_emb, tuple):
+            rotary_pos_emb = (rotary_pos_emb,) * 2
+
+        # =====================
+        # Query, Key, and Value
+        # =====================
+        # Get the query, key and value tensors based on the type of attention -
+        # self or cross attn.
+        query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)
+
+        # ===================================================
+        # Adjust key, value, and rotary_pos_emb for inference
+        # ===================================================
+        key, value, rotary_pos_emb, attn_mask_type = self._adjust_key_value_for_inference(
+            inference_params, key, value, rotary_pos_emb
+        )
+
+        if packed_seq_params is not None:
+            query = query.squeeze(1)
+            key = key.squeeze(1)
+            value = value.squeeze(1)
+
+        # ================================================
+        # relative positional embedding (rotary embedding)
+        # ================================================
+        if rotary_pos_emb is not None:
+            q_pos_emb, k_pos_emb = rotary_pos_emb
+
+            if packed_seq_params is not None:
+                cu_seqlens_q = packed_seq_params.cu_seqlens_q
+                cu_seqlens_kv = packed_seq_params.cu_seqlens_kv
+            else:
+                cu_seqlens_q = cu_seqlens_kv = None
+            query = apply_rotary_pos_emb(
+                query, q_pos_emb, config=self.config, cu_seqlens=cu_seqlens_q
+            )
+            key = apply_rotary_pos_emb(key, k_pos_emb, config=self.config, cu_seqlens=cu_seqlens_kv)
+
+            # TODO, can apply positional embedding to value_layer so it has
+            # absolute positional embedding.
+            # otherwise, only relative positional embedding takes effect
+            # value_layer = apply_rotary_pos_emb(value_layer, k_pos_emb)
+
+        # ==================================
+        # diff attention reshaping
+        # ==================================
+        
+        query = query.reshape(
+            query.shape[:-2] + (
+                self.num_query_groups_per_partition // 2,
+                2,
+                query.shape[-1],
+            )
+        )
+        key = key.reshape(
+            key.shape[:-2] + (
+                self.num_query_groups_per_partition // 2,
+                2,
+                key.shape[-1],
+            )
+        )
+        value = value.reshape(
+            value.shape[:-2] + (
+                self.num_attention_heads_per_partition // 2,
+                2,
+                value.shape[-1],
+            )
+        )
+        query1, query2 = query[:, :, :, 0], query[:, :, :, 1]
+        key1, key2 = key[:, :, :, 0], key[:, :, :, 1]
+        value1, value2 = value[:, :, :, 0], value[:, :, :, 1]
+        
+
+        # ==================================
+        # core attention computation
+        # ==================================
+        corr_attn_func = None
+        if self.checkpoint_core_attention and self.training:
+            corr_attn_func = self._checkpointed_attention_forward
+        else:
+            core_attn_func = self.core_attention
+        
+        attn11 = core_attn_func(
+                query1,
+                key1,
+                value1,
+                attention_mask,
+                attn_mask_type=attn_mask_type,
+                packed_seq_params=packed_seq_params,
+            )
+
+        attn12 = core_attn_func(
+                query1,
+                key1,
+                value2,
+                attention_mask,
+                attn_mask_type=attn_mask_type,
+                packed_seq_params=packed_seq_params,
+            )
+        
+        attn1 = torch.cat([attn11, attn12], dim=-1)
+        
+        # =================
+        
+        attn21 = core_attn_func(
+                query2,
+                key2,
+                value1,
+                attention_mask,
+                attn_mask_type=attn_mask_type,
+                packed_seq_params=packed_seq_params,
+            )
+        attn22 = core_attn_func(
+                query2,
+                key2,
+                value2,
+                attention_mask,
+                attn_mask_type=attn_mask_type,
+                packed_seq_params=packed_seq_params,
+            )
+        attn2 = torch.cat([attn21, attn22], dim=-1)
+        
+        lambda_1 = torch.exp(torch.sum(self.lambda_q1 * self.lambda_k1, dim=-1).float()).type_as(query)
+        lambda_2 = torch.exp(torch.sum(self.lambda_q2 * self.lambda_k2, dim=-1).float()).type_as(query)
+        lambda_full = lambda_1 - lambda_2 + self.lambda_init
+        core_attn_out = attn1 - lambda_full * attn2
+        
+
+        if packed_seq_params is not None:
+            # reshape to same output shape as unpacked case
+            # (t, np, hn) -> (t, b=1, h=np*hn)
+            # t is the pack size = sum (sq_i)
+            # note that batch is a dummy dimension in the packed case
+            core_attn_out = core_attn_out.reshape(core_attn_out.size(0), 1, -1)
+
+        # =================
+        # Output. [sq, b, h]
+        # =================
+
+        output, bias = self.linear_proj(core_attn_out)
+
+        return output, bias
+
+
 class CrossAttention(Attention):
     """Cross-attention layer class
 

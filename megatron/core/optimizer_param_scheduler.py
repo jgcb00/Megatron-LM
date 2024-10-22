@@ -101,7 +101,6 @@ class OptimizerParamScheduler:
         self.total_steps = args.train_iters
         self.model_optimizer = args.optimizer
         self.global_batch_size = args.global_batch_size
-        print("Optimiser Param scheduler, total steps: ", self.total_steps)
         assert self.total_steps is not None
 
 
@@ -225,8 +224,8 @@ class OptimizerParamScheduler:
             if self.model_optimizer == "ademamix":
                 param_group['alpha'] = self.get_alpha()
                 param_group['betas'] = (self.beta1, self.beta2, self.get_beta3())
-            if self.model_optimizer == "ademamix" and self.num_steps/self.global_batch_size % 100 == 0:
-                print("Step: ", self.num_steps, " LR: ", new_lr, " WD: ", new_wd, " Beta3: ", self.get_beta3(), " Alpha: ", self.get_alpha())
+            # if self.model_optimizer == "ademamix" and self.num_steps/self.global_batch_size % 100 == 0:
+            #     print("Step: ", self.num_steps, " LR: ", new_lr, " WD: ", new_wd, " Beta3: ", self.get_beta3(), " Alpha: ", self.get_alpha())
 
     def state_dict(self) -> dict:
         """Return the state dict."""

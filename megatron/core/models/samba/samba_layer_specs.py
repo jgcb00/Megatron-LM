@@ -9,7 +9,7 @@ from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.ssm.samba_block import SambaStack, SambaStackSubmodules
 from megatron.core.ssm.mamba_layer import MambaLayer, MambaLayerSubmodules
 from megatron.core.ssm.mamba_mixer import MambaMixer, MambaMixerSubmodules
-from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
+from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules, DiffSelfAttention
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.mlp import MLP, MLPSubmodules
 from megatron.core.transformer.spec_utils import ModuleSpec
@@ -37,7 +37,7 @@ samba_stack_spec = ModuleSpec(
             module=TransformerLayer,
             submodules=TransformerLayerSubmodules(
                 self_attention=ModuleSpec(
-                    module=SelfAttention,
+                    module=DiffSelfAttention,
                     params={"attn_mask_type": AttnMaskType.causal},
                     submodules=SelfAttentionSubmodules(
                         linear_qkv=TELayerNormColumnParallelLinear,

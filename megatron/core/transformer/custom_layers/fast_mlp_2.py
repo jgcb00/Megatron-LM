@@ -128,7 +128,7 @@ class FastMLP(MegatronModule):
         ).unsqueeze(0).expand(self.fffn_config.parallel_trees, -1) + (torch.arange(self.fffn_config.parallel_trees) * ((2**self.fffn_config.depth -1) + self.fffn_config.master_node_width_by_parallel_tree) ).unsqueeze(1)
 
         right_children = left_children + 1
-        leave_fake_children = torch.zeros((self.parallel_trees, 2 ** (self.fffn_config.depth - 1) + self.fffn_config.master_node_width_by_parallel_tree), dtype=torch.long)
+        leave_fake_children = torch.zeros((self.fffn_config.parallel_trees, 2 ** (self.fffn_config.depth - 1) + self.fffn_config.master_node_width_by_parallel_tree), dtype=torch.long)
 
         self.left_children = torch.cat([left_children, leave_fake_children], dim=1).view(-1)
         self.right_children = torch.cat([right_children, leave_fake_children], dim=1).view(-1)

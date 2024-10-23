@@ -21,7 +21,7 @@ import fastfeedforward_cuda
 class FastMLPSubmodules:
     linear_fc1: Union[ModuleSpec, type] = None
     linear_fc2: Union[ModuleSpec, type] = None
-    parallel_trees: Optional[int] = 128
+    parallel_trees: Optional[int] = 64
     master_node: Optional[bool] = True
     master_node_width: Optional[int] = None
     load_balancing_update_rate: Optional[float] = 1e-3
@@ -107,15 +107,15 @@ class FastMLP(MegatronModule):
             tensor_model_parallel_size=args.tensor_model_parallel_size,
         )
         self.linear_fc1 = torch.nn.Parameter(torch.randn(
-            (self.input_size, self.fffn_config.hidden_size), dtype=torch.bfloat16
+            (self.input_size, self.fffn_config.hidden_size),
         ))
         self.bias = torch.nn.Parameter(torch.zeros((self.fffn_config.hidden_size,), dtype=torch.bfloat16))
         self.linear_fc2 = torch.nn.Parameter(torch.randn(
-            (self.fffn_config.hidden_size, self.input_size), dtype=torch.bfloat16
+            (self.fffn_config.hidden_size, self.input_size),
         ))
         
         #Load balancing bias
-        self.lb_bias = torch.nn.Parameter(torch.zeros((self.fffn_config.hidden_size,)), dtype=torch.bfloat16, requires_grad=False)
+        self.lb_bias = torch.nn.Parameter(torch.zeros((self.fffn_config.hidden_size,)), requires_grad=False)
         self.load = None
         self.work = None
         left_children = torch.tensor(
@@ -150,7 +150,7 @@ class FastMLP(MegatronModule):
             self.lb_bias.data = self.lb_bias.data + self.fffn_config.load_balancing_update_rate * self.update_sign
             self.work = None
             self.load = None
-    
+
         output, activated_nodes = fastfeedforward_cuda.fffn_function(
             hidden_states,
             self.linear_fc1,

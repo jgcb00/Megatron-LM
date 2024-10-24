@@ -146,6 +146,8 @@ class FastMLP(MegatronModule):
         if self.work is not None:
             self.work.wait()
             # self.update_sign[(self.update_sign > -5) & (self.update_sign < 5)] = 0
+            if dist.get_rank() == 0:
+                print(self.load.view(self.fffn_config.parallel_trees, -1))
             self.load = torch.clamp(self.load, min=-1, max=1)
             self.lb_bias.data = self.lb_bias.data + self.fffn_config.load_balancing_update_rate * self.update_sign
             self.work = None

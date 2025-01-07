@@ -611,6 +611,7 @@ class DiffSelfAttention(SelfAttention):
                 key.shape[-1],
             )
         )
+        """
         value = value.reshape(
             value.shape[:-2] + (
                 self.num_attention_heads_per_partition // 2,
@@ -618,9 +619,10 @@ class DiffSelfAttention(SelfAttention):
                 value.shape[-1],
             )
         )
+        """
         query1, query2 = query[:, :, :, 0], query[:, :, :, 1]
         key1, key2 = key[:, :, :, 0], key[:, :, :, 1]
-        value1, value2 = value[:, :, :, 0], value[:, :, :, 1]
+        #value1, value2 = value[:, :, :, 0], value[:, :, :, 1]
         
 
         # ==================================
@@ -632,15 +634,16 @@ class DiffSelfAttention(SelfAttention):
         else:
             core_attn_func = self.core_attention
         
-        attn11 = core_attn_func(
+        attn1 = core_attn_func(
                 query1,
                 key1,
-                value1,
+                value,
                 attention_mask,
                 attn_mask_type=attn_mask_type,
                 packed_seq_params=packed_seq_params,
             )
 
+        """
         attn12 = core_attn_func(
                 query1,
                 key1,
@@ -651,17 +654,18 @@ class DiffSelfAttention(SelfAttention):
             )
         
         attn1 = torch.cat([attn11, attn12], dim=-1)
-        
+        """
         # =================
         
-        attn21 = core_attn_func(
+        attn2 = core_attn_func(
                 query2,
                 key2,
-                value1,
+                value,
                 attention_mask,
                 attn_mask_type=attn_mask_type,
                 packed_seq_params=packed_seq_params,
             )
+        """
         attn22 = core_attn_func(
                 query2,
                 key2,
@@ -671,6 +675,7 @@ class DiffSelfAttention(SelfAttention):
                 packed_seq_params=packed_seq_params,
             )
         attn2 = torch.cat([attn21, attn22], dim=-1)
+        """
         
         lambda_1 = torch.exp(torch.sum(self.lambda_q1 * self.lambda_k1, dim=-1).float()).type_as(query)
         lambda_2 = torch.exp(torch.sum(self.lambda_q2 * self.lambda_k2, dim=-1).float()).type_as(query)

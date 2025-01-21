@@ -37,7 +37,7 @@ GPT_MODEL_ARGS=(
 
 TRAINING_ARGS=(
     --num-workers 16
-    --micro-batch-size 5
+    --micro-batch-size 4
     --train-samples 12207050 
     --weight-decay 0.1 
     --adam-beta1 0.9 

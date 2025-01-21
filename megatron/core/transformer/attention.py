@@ -611,15 +611,13 @@ class DiffSelfAttention(SelfAttention):
                 key.shape[-1],
             )
         )
-        """
+        
         value = value.reshape(
             value.shape[:-2] + (
                 self.num_attention_heads_per_partition // 2,
-                2,
                 value.shape[-1],
             )
         )
-        """
         query1, query2 = query[:, :, :, 0], query[:, :, :, 1]
         key1, key2 = key[:, :, :, 0], key[:, :, :, 1]
         #value1, value2 = value[:, :, :, 0], value[:, :, :, 1]

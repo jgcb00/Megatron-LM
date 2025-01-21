@@ -615,7 +615,7 @@ class DiffSelfAttention(SelfAttention):
         value = value.reshape(
             value.shape[:-2] + (
                 self.num_attention_heads_per_partition // 2,
-                value.shape[-1],
+                2*value.shape[-1],
             )
         )
         query1, query2 = query[:, :, :, 0], query[:, :, :, 1]

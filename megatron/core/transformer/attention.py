@@ -633,7 +633,9 @@ class DiffSelfAttention(SelfAttention):
             corr_attn_func = self._checkpointed_attention_forward
         else:
             core_attn_func = self.core_attention
-        
+        print("shape of query1", query1.shape)
+        print("shape of key1", key1.shape)
+        print("shape of value", value.shape)
         attn1 = core_attn_func(
                 query1,
                 key1,

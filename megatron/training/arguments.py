@@ -1048,6 +1048,8 @@ def _add_regularization_args(parser):
                        'numerical stability')
     group.add_argument('--sgd-momentum', type=float, default=0.9,
                        help='Momentum factor for sgd')
+    group.add_argument('--slw_warmup_steps', type=int, default=None,
+                        help='Number of steps for sequence length warmup')
     return parser
 
 

@@ -101,12 +101,24 @@ class OptimizerParamScheduler:
         self.total_steps = args.train_iters
         self.model_optimizer = args.optimizer
         self.global_batch_size = args.global_batch_size
+        
+        # SLW
+
+        self.slw_warmup_steps = args.slw_warmup_steps
+        if self.slw_warmup_steps is not None:
+            assert self.slw_warmup_steps < self.total_steps
+        else:
+            self.slw_warmup_steps = 1
         assert self.total_steps is not None
 
 
         # Set the learning rate
         self.step(0)
         log_single_rank(logger, logging.INFO, f"> learning rate decay style: {self.lr_decay_style}")
+
+    def get_slw(self) -> float:
+        return min(self.num_steps/self.global_batch_size/self.total_steps, 1.0)
+
 
     def get_beta3(self) -> float:
         return min(

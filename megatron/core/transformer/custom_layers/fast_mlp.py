@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import torch.distributed as dist
 from functools import partial
 from megatron.core.dist_checkpointing.mapping import ReplicaId, ShardedStateDict
-from megatron.core.fusions.fused_bias_gelu import bias_gelu_impl
+from megatron.core.fusions.fused_bias_relu_squared import bias_relu2_impl
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.transformer_config import TransformerConfig
@@ -223,9 +223,9 @@ def apply_custom_fff_activation(
         -1, parallel_trees, 2**depth - 1 + master_node_width
     )  # (batch_size, parallel_size, n_nodes)
     if bias_parallel is not None:
-        flatten_intermediate = bias_gelu_impl(flatten_intermediate, bias_parallel)
+        flatten_intermediate = bias_relu2_impl(flatten_intermediate, bias_parallel)
     else:
-        flatten_intermediate = bias_gelu_impl(flatten_intermediate, torch.zeros((flatten_intermediate.shape[-1]), device=flatten_intermediate.device, dtype=flatten_intermediate.dtype))
+        flatten_intermediate = bias_relu2_impl(flatten_intermediate, torch.zeros((flatten_intermediate.shape[-1]), device=flatten_intermediate.device, dtype=flatten_intermediate.dtype))
     batch_size = flatten_intermediate.size(0)
 
     decisions = logit_decisions.view(

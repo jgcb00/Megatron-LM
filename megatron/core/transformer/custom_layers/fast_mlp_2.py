@@ -166,8 +166,8 @@ class FastMLP(MegatronModule):
             self.fffn_config.n_nodes,
         )
     
-        node, load = torch.unique(activated_nodes.view(-1))
-        total_load = torch.zeros(self.fffn_config.hidden_size, dtype=torch.int32)
+        node, load = torch.unique(activated_nodes.view(-1), return_counts=True)
+        total_load = torch.zeros(self.fffn_config.n_nodes * self.fffn_config.parallel_trees, dtype=torch.int32, device=hidden_states.device)
         total_load[node] = load
         
         if self.training and self.work is None:

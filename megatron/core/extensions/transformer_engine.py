@@ -4,7 +4,7 @@ import dataclasses
 import os
 import warnings
 from importlib.metadata import version
-from typing import Callable
+from typing import Callable, Optional, Tuple
 
 import torch
 import transformer_engine as te
@@ -243,6 +243,7 @@ class TELayerNormColumnParallelLinear(te.pytorch.LayerNormLinear):
         is_expert: bool,
         skip_weight_param_allocation: bool = False,
         tp_comm_buffer_name: str = None,
+        return_layernorm_output : bool = False,
     ):
         self.config = config
 
@@ -263,6 +264,7 @@ class TELayerNormColumnParallelLinear(te.pytorch.LayerNormLinear):
         # ourselves. This way our forward always returns two values
         # and we don't have to deal with the zero length Tensor.
         self.te_return_bias = skip_bias_add and bias
+        self.return_layernorm_output = return_layernorm_output
         self.is_first_microbatch = True
         self.disable_parameter_transpose_cache = self.config.disable_parameter_transpose_cache
         extra_kwargs = _get_extra_te_kwargs(config)
@@ -323,7 +325,7 @@ class TELayerNormColumnParallelLinear(te.pytorch.LayerNormLinear):
             bias=bias,
             return_bias=self.te_return_bias,
             parallel_mode="column",
-            return_layernorm_output=False,
+            return_layernorm_output=return_layernorm_output,
             zero_centered_gamma=self.config.layernorm_zero_centered_gamma,
             **extra_kwargs,
         )
@@ -333,14 +335,157 @@ class TELayerNormColumnParallelLinear(te.pytorch.LayerNormLinear):
         _is_first_microbatch = (
             None if self.disable_parameter_transpose_cache else self.is_first_microbatch
         )
-        out = super().forward(x, is_first_microbatch=_is_first_microbatch)
+        if self.return_layernorm_output:
+            post_ln, out = super().forward(x, is_first_microbatch=_is_first_microbatch)
+        else:
+            out = super().forward(x, is_first_microbatch=_is_first_microbatch)
+        
         self.is_first_microbatch = False
 
         # TE only returns a tuple when return_bias is True, otherwise
         # it returns a single Tensor, we always want to return two
         # values regardless of the arguments.
         if self.te_return_bias:
-            return out
+            if self.return_layernorm_output:
+                return post_ln, out
+            else :
+                return out
+        if self.return_layernorm_output:
+            return post_ln, out, None
+        return out, None
+
+    def sharded_state_dict(self, prefix='', sharded_offsets=(), metadata=None):
+        """Sharding along axis 0, bias sharded"""
+        state_dict = self.state_dict(prefix='', keep_vars=True)
+        return make_sharded_tensors_for_checkpoint(
+            state_dict, prefix, {'weight': 0, 'bias': 0}, sharded_offsets
+        )
+
+
+class TELayerNormMLP(te.pytorch.LayerNormMLP):
+    """
+    Wrapper for the Transformer-Engine's `LayerNormLinear` layer that combines
+    layernorm and linear layers
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        #eps default to 1e-5
+        *,
+        config: TransformerConfig,
+        init_method: Callable,
+        bias: bool,
+        skip_bias_add: bool,
+        activation = "squared_relu", # one of 'gelu', 'geglu', 'relu', 'reglu', 'squared_relu', 'swiglu', 'qgemu', 'srelu'
+        tp_comm_buffer_name: str = None,
+        return_layernorm_output : bool = False,
+    ):
+        self.config = config
+        extra_kwargs = _get_extra_te_kwargs(config)
+
+        if extra_kwargs["gather_output"]:
+            raise ValueError('Transformer Engine linear layers do not support gather_output = True')
+
+        if extra_kwargs["is_expert"]:
+            raise ValueError('Transformer Engine linear layers do not yet support MoE')
+
+        if extra_kwargs["skip_weight_param_allocation"]:
+            raise ValueError(
+                'Transformer Engine linear layers do not support skip_weight_param_allocation'
+            )
+
+        # TE returns a zero length Tensor when bias=False and
+        # return_bias=True, but we prefer None.  So in that case we
+        # tell TE to not return the bias, and return None
+        # ourselves. This way our forward always returns two values
+        # and we don't have to deal with the zero length Tensor.
+        self.te_return_bias = skip_bias_add and bias
+
+        self.return_layernorm_output = return_layernorm_output
+        self.is_first_microbatch = True
+        self.disable_parameter_transpose_cache = self.config.disable_parameter_transpose_cache
+
+        # Only Transformer-Engine version >= 0.11.0 supports `RMSNorm`
+        normalization = self.config.normalization
+        if self.config.normalization not in ["LayerNorm", "RMSNorm"]:
+            raise ValueError(
+                f"Transformer Engine v{_te_version} does not support {self.config.normalization}."
+            )
+
+        if _te_version >= packaging.version.Version("0.8.0"):
+            if self.config.tp_comm_overlap:
+                extra_kwargs["ub_bulk_wgrad"] = self.config.tp_comm_bulk_wgrad
+                extra_kwargs["ub_bulk_dgrad"] = self.config.tp_comm_bulk_dgrad
+                if _te_version > packaging.version.Version("1.5.0"):
+                    # Use old overlap flags if they were supplied instead
+                    extra_kwargs["ub_overlap_ag"] = (
+                        self.config.tp_comm_overlap_ag
+                        if hasattr(self.config, "tp_comm_overlap_ag")
+                        else self.config.tp_comm_split_ag or self.config.tp_comm_atomic_ag
+                    )
+                    if _te_version > packaging.version.Version("1.6.0.dev0"):
+                        extra_kwargs["ub_overlap_rs_dgrad"] = (
+                            self.config.tp_comm_overlap_rs_dgrad
+                            if hasattr(self.config, "tp_comm_overlap_rs_dgrad")
+                            else False
+                        )
+                else:
+                    extra_kwargs["ub_atomic_gemm_ag"] = self.config.tp_comm_atomic_ag
+                    extra_kwargs["ub_split_ag"] = self.config.tp_comm_split_ag
+                if _te_version > packaging.version.Version("1.0.0"):
+                    assert (
+                        tp_comm_buffer_name is not None
+                    ), "Buffer name should be set to configure communication overlap settings"
+                    extra_kwargs["ub_name"] = tp_comm_buffer_name
+
+        super().__init__(
+            hidden_size=input_size,
+            ffn_hidden_size=hidden_size,
+            eps=self.config.layernorm_epsilon,
+            bias=bias,
+            normalization=normalization,
+            activation=activation,
+            init_method=condition_init_method(config, init_method),
+            output_layer_init_method=condition_init_method(config, init_method),
+            return_layernorm_output=return_layernorm_output,
+            return_layernorm_output_gathered=False,
+            zero_centered_gamma=self.config.layernorm_zero_centered_gamma,
+
+            set_parallel_mode=True if self.config.tensor_model_parallel_size > 1 else False,
+            sequence_parallel=self.config.sequence_parallel,
+            tp_group=get_tensor_model_parallel_group(check_initialized=False),
+            tp_size=self.config.tensor_model_parallel_size,
+            
+            fuse_wgrad_accumulation=self.config.gradient_accumulation_fusion,
+            return_bias=self.te_return_bias,
+
+            **extra_kwargs,
+        )
+
+    def forward(self, x):
+        """Forward."""
+        _is_first_microbatch = (
+            None if self.disable_parameter_transpose_cache else self.is_first_microbatch
+        )
+        if self.return_layernorm_output:
+            post_ln, out = super().forward(x, is_first_microbatch=_is_first_microbatch)
+        else:
+            out = super().forward(x, is_first_microbatch=_is_first_microbatch)
+        
+        self.is_first_microbatch = False
+
+        # TE only returns a tuple when return_bias is True, otherwise
+        # it returns a single Tensor, we always want to return two
+        # values regardless of the arguments.
+        if self.te_return_bias:
+            if self.return_layernorm_output:
+                return post_ln, out
+            else :
+                return out
+        if self.return_layernorm_output:
+            return post_ln, out, None
         return out, None
 
     def sharded_state_dict(self, prefix='', sharded_offsets=(), metadata=None):
@@ -547,6 +692,7 @@ class TEDotProductAttention(te.pytorch.DotProductAttention):
         attention_mask: Tensor,
         attn_mask_type: AttnMaskType,
         packed_seq_params: PackedSeqParams = None,
+        window_size : Optional[Tuple[int, int]] = None,
     ):
         """Forward."""
         packed_seq_kwargs = (
@@ -592,10 +738,11 @@ class TEDotProductAttention(te.pytorch.DotProductAttention):
                 value,
                 attention_mask,
                 attn_mask_type=attn_mask_type.name,
+                window_size=window_size,
                 **packed_seq_kwargs,
             )
         else:
-            core_attn_out = super().forward(query, key, value, attention_mask, **packed_seq_kwargs)
+            core_attn_out = super().forward(query, key, value, attention_mask, **packed_seq_kwargs, window_size=window_size)
 
         if self.config.apply_rope_fusion and qkv_format == 'bshd':
             return core_attn_out.transpose(0, 1)

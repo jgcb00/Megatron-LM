@@ -49,6 +49,8 @@ GPT_MODEL_ARGS=(
     --use-mcore-models
     --no-create-attention-mask-in-dataloader
     --sliding-window-attention 2048
+    --position-embedding-type none
+
 )
 
 TRAINING_ARGS=(
@@ -68,6 +70,7 @@ TRAINING_ARGS=(
     #--lr-decay-iters 430000 
     --use-flash-attn
     #--use-distributed-optimizer
+    --sequence-parallel
 
 )
 

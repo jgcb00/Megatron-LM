@@ -15,8 +15,8 @@ from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.dragon_layer import DragonLayer, DragonLayerSubmodules
 from megatron.core.ssm.mamba_layer import MambaLayer, MambaLayerSubmodules
 from megatron.core.ssm.mamba_mixer import MambaMixer, MambaMixerSubmodules
-
-
+from megatron.core.ssm.dragon_mamba_mixer import DragonMambaMixer, DragonMambaMixerSubmodules
+from megatron.core.transformer.dragon_block import DragonStack, DragonStackSubmodules
 try:
     from megatron.core.extensions.transformer_engine import (
         TEColumnParallelGroupedLinear,
@@ -26,6 +26,7 @@ try:
         TENorm,
         TERowParallelGroupedLinear,
         TERowParallelLinear,
+        TELayerNormMLP,
     )
 
     HAVE_TE = True
@@ -47,13 +48,57 @@ except ImportError:
     warnings.warn('Apex is not installed. Falling back to Torch LayerNorm')
     LNImpl = WrappedTorchLayerNorm
 
+dragon_stack_spec = ModuleSpec(
+    module=DragonStack,
+    submodules=DragonStackSubmodules(
+        dragon_layer=ModuleSpec(
+            module=DragonLayer,
+            submodules=DragonLayerSubmodules(
+                input_layernorm=TENorm, #Would need to be removed to fuse in input_projection
+                input_projection=TELayerNormColumnParallelLinear,
+                self_attention=ModuleSpec(
+                    module=DragonDiffSelfAttention,
+                    params={"attn_mask_type": AttnMaskType.causal},
+                    submodules=DragonSelfAttentionSubmodules(
+                        linear_qkv=TEColumnParallelLinear,
+                        core_attention=TEDotProductAttention,
+                        linear_proj=TERowParallelLinear,
+                        # TENorm significantly harms convergence when used
+                        # for QKLayerNorm; we instead use the Apex implementation.
+                        q_layernorm=FusedLayerNorm,
+                        k_layernorm=FusedLayerNorm,
+                    ),
+                ),
+                self_attn_layernorm=TENorm,
+                mamba=ModuleSpec(
+                    module=MambaLayer,
+                    submodules=MambaLayerSubmodules(
+                        mixer=ModuleSpec(
+                            module=DragonMambaMixer,
+                            submodules=DragonMambaMixerSubmodules(
+                                in_proj=TELayerNormColumnParallelLinear
+                            ),
+                        ),
+                    ),
+                ),
+                mamba_layernorm=TENorm,
+                output_projection=TERowParallelLinear,
+                
+                mlp=TELayerNormMLP,
+            ),
+        )
+    )
+)
 
-def get_gpt_layer_with_transformer_engine_spec(
+
+
+def get_dragon_layer_with_transformer_engine_spec(
     num_experts: Optional[int] = None,
     moe_grouped_gemm: Optional[bool] = False,
     qk_layernorm: Optional[bool] = False,
     fp8: Optional[str] = None,
 ) -> ModuleSpec:
+    pass
     """Use this spec to use lower-level Transformer Engine modules (required for fp8 training).
 
 
@@ -66,137 +111,6 @@ def get_gpt_layer_with_transformer_engine_spec(
     Returns:
         ModuleSpec: Module specification with TE modules
     """
-    mlp = _get_mlp_module_spec(
-        use_te=True, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm, fp8=fp8
-    )
-    return ModuleSpec(
-        module=DragonLayer,
-        submodules=DragonLayerSubmodules(
-            input_projection=TELayerNormColumnParallelLinear,
-            self_attention=ModuleSpec(
-                module=DragonDiffSelfAttention,
-                params={"attn_mask_type": AttnMaskType.causal},
-                submodules=DragonSelfAttentionSubmodules(
-                    core_attention=TEDotProductAttention,
-                    linear_proj=TERowParallelLinear,
-                    # TENorm significantly harms convergence when used
-                    # for QKLayerNorm; we instead use the Apex implementation.
-                    q_layernorm=FusedLayerNorm,
-                    k_layernorm=FusedLayerNorm,
-                ),
-            ),
-            self_attn_layernorm=TENorm,
-            mamba=ModuleSpec(
-                module=MambaLayer,
-                submodules=MambaLayerSubmodules(
-                    mixer=ModuleSpec(
-                        module=MambaMixer,
-                        submodules=MambaMixerSubmodules(
-                            in_proj=TELayerNormColumnParallelLinear, out_proj=TERowParallelLinear
-                        ),
-                    ),
-                    mamba_bda=get_bias_dropout_add,
-                ),
-            ),
-            mamba_layernorm=TENorm,
-            output_projection=TERowParallelLinear,
-            
-            mlp=mlp,
-        ),
-    )
+    return 
 
 
-def get_gpt_layer_local_spec(
-    num_experts: Optional[int] = None,
-    moe_grouped_gemm: Optional[bool] = False,
-    qk_layernorm: Optional[bool] = False,
-) -> ModuleSpec:
-    """Use this spec for an implementation using only modules in Megatron-Core.
-
-
-    Args:
-        num_experts (int, optional): Number of experts. Defaults to None.
-        moe_grouped_gemm (bool, optional): To use Grouped GEMM. Defaults to False.
-        qk_layernorm (bool, optional): To use layernorm for queries/keys. Defaults to False.
-
-    Returns:
-        ModuleSpec: Module specification with Megatron-Core modules
-    """
-    mlp = _get_mlp_module_spec(
-        use_te=False, num_experts=num_experts, moe_grouped_gemm=moe_grouped_gemm
-    )
-    return ModuleSpec(
-        module=DragonLayer,
-        submodules=DragonLayerSubmodules(
-            input_layernorm=LNImpl,
-            self_attention=ModuleSpec(
-                module=DiffSelfAttention,
-                params={"attn_mask_type": AttnMaskType.causal},
-                submodules=SelfAttentionSubmodules(
-                    linear_qkv=ColumnParallelLinear,
-                    core_attention=DotProductAttention,
-                    linear_proj=RowParallelLinear,
-                    q_layernorm=LNImpl if qk_layernorm else IdentityOp,
-                    k_layernorm=LNImpl if qk_layernorm else IdentityOp,
-                ),
-            ),
-            self_attn_bda=get_bias_dropout_add,
-            pre_mlp_layernorm=LNImpl,
-            mlp=mlp,
-            mlp_bda=get_bias_dropout_add,
-            sharded_state_dict_keys_map={
-                'input_layernorm.': 'self_attention.linear_qkv.layer_norm_',
-                'pre_mlp_layernorm.': 'mlp.linear_fc1.layer_norm_',
-            },
-        ),
-    )
-
-
-def _get_mlp_module_spec(
-    use_te: Optional[bool] = True,
-    num_experts: Optional[int] = None,
-    moe_grouped_gemm: Optional[bool] = False,
-    fp8: Optional[str] = None,
-) -> ModuleSpec:
-    """Helper function to get module spec for MLP/MoE"""
-    if num_experts is None:
-        # Dense MLP w/ or w/o TE modules.
-        return ModuleSpec(
-            module=MLP,
-            submodules=MLPSubmodules(
-                linear_fc1=TELayerNormColumnParallelLinear if use_te else ColumnParallelLinear,
-                linear_fc2=TERowParallelLinear if use_te else RowParallelLinear,
-            ),
-        )
-    else:
-        # Mixture of experts with modules in megatron core.
-        if use_te and moe_grouped_gemm:
-            linear_fc1 = TEColumnParallelGroupedLinear
-            linear_fc2 = TERowParallelGroupedLinear
-        elif use_te and fp8:
-            linear_fc1 = TEColumnParallelLinear
-            linear_fc2 = TERowParallelLinear
-        else:
-            linear_fc1 = ColumnParallelLinear
-            linear_fc2 = RowParallelLinear
-
-        use_te_grouped_gemm = use_te and TEColumnParallelGroupedLinear is not None
-
-        return ModuleSpec(
-            module=MoELayer,
-            submodules=MoESubmodules(
-                experts=(
-                    MLPSubmodules(linear_fc1=linear_fc1, linear_fc2=linear_fc2)
-                    if not moe_grouped_gemm or use_te_grouped_gemm
-                    else None
-                ),
-                shared_experts=ModuleSpec(
-                    module=SharedExpertMLP,
-                    params={"gate": False},
-                    submodules=MLPSubmodules(
-                        linear_fc1=TEColumnParallelLinear if use_te else ColumnParallelLinear,
-                        linear_fc2=TERowParallelLinear if use_te else RowParallelLinear,
-                    ),
-                ),
-            ),
-        )

@@ -16,7 +16,6 @@ from megatron.core.datasets.blended_megatron_dataset_builder import BlendedMegat
 from megatron.core.datasets.utils import get_blend_from_list
 from megatron.core.datasets.gpt_dataset import GPTDatasetConfig
 from megatron.core.datasets.gpt_dataset import MockGPTDataset, GPTDataset
-from megatron.core.models.samba import SambaModel
 from megatron.training import pretrain
 from megatron.core.utils import StragglerDetector
 from megatron.core.transformer.spec_utils import import_module
@@ -25,8 +24,8 @@ from megatron.training.utils import (
     get_batch_on_this_tp_rank,
 )
 from megatron.training.arguments import core_transformer_config_from_args
-from megatron.core.models.gpt.gpt_layer_specs import get_gpt_layer_with_transformer_engine_spec
-
+from megatron.core.models.dragon.dragon_layer_specs import get_dragon_layer_with_transformer_engine_spec
+from megatron.core.models.dragon.dragon_model import DragonModel
 
 stimer = StragglerDetector()
 
@@ -39,7 +38,7 @@ def count_parameters_in_layer(model, layer_name):
     return num_params
 
 
-def model_provider(pre_process=True, post_process=True) -> SambaModel:
+def model_provider(pre_process=True, post_process=True) -> DragonModel:
     """Builds the model.
 
     Args:
@@ -52,7 +51,7 @@ def model_provider(pre_process=True, post_process=True) -> SambaModel:
     """
     args = get_args()
 
-    print_rank_0('building Samba model ...')
+    print_rank_0('building Dragon model ...')
     config = core_transformer_config_from_args(get_args())
 
     assert args.use_legacy_models == False, "Mamba only supported in Mcore!"
@@ -60,9 +59,9 @@ def model_provider(pre_process=True, post_process=True) -> SambaModel:
     if args.spec is not None:
         samba_stack_spec = import_module(args.spec)
     else:
-        raise("You must provide a valid Mamba layer spec!")
+        raise ValueError("You must provide a valid Dragon layer spec!")
 
-    model = SambaModel(
+    model = DragonModel(
         config=config,
         samba_stack_spec=samba_stack_spec,
         vocab_size=args.padded_vocab_size,
@@ -142,7 +141,7 @@ def loss_func(loss_mask: torch.Tensor, output_tensor: torch.Tensor):
     )
 
 
-def forward_step(data_iterator, model: SambaModel):
+def forward_step(data_iterator, model: DragonModel):
     """Forward training step.
 
     Args:

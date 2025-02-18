@@ -53,6 +53,8 @@ from megatron.core.num_microbatches_calculator import (
     get_num_microbatches,
     update_num_microbatches)
 
+from megatron.core.transformer.dragon_attention import OPTIMIZER_PARAM_SCHEDULER
+
 from .async_utils import maybe_finalize_async_save
 from .utils import (
     calc_params_l2_norm,
@@ -632,6 +634,7 @@ def setup_model_and_optimizer(model_provider_func,
     optimizer = get_megatron_optimizer(config, model, no_wd_decay_cond,
                                        scale_lr_cond, lr_mult)
     opt_param_scheduler = get_optimizer_param_scheduler(optimizer)
+    OPTIMIZER_PARAM_SCHEDULER = opt_param_scheduler
 
     if args.moe_use_upcycling:
         assert not os.path.exists(

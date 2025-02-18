@@ -7,24 +7,21 @@ from torch import Tensor
 
 from megatron.core import InferenceParams, tensor_parallel
 from megatron.core.config_logger import has_config_logger_enabled, log_config_to_disk
-from megatron.core.dist_checkpointing.mapping import ShardedStateDict
 from megatron.core.models.common.embeddings.language_model_embedding import LanguageModelEmbedding
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
 from megatron.core.models.common.language_module.language_module import LanguageModule
-from megatron.core.packed_seq_params import PackedSeqParams
 from megatron.core.transformer.enums import ModelType
-from megatron.core.transformer.spec_utils import ModuleSpec
-from megatron.core.transformer.transformer_block import TransformerBlock
+from megatron.core.transformer.spec_utils import ModuleSpec, build_module
 from megatron.core.transformer.dragon_config import DragonConfig
 
 
 class DragonModel(LanguageModule):
-    """GPT Transformer language model.
+    """SambaModel language model.
 
     Args:
         config (TransformerConfig):
             Transformer config
-        transformer_layer_spec (ModuleSpec):
+        dragon_layer_spec (ModuleSpec):
             Specifies module to use for transformer layers
         vocab_size (int):
             Vocabulary size
@@ -32,6 +29,10 @@ class DragonModel(LanguageModule):
             maximum size of sequence. This is used for positional embedding
         pre_process (bool, optional):
             Include embedding layer (used with pipeline parallelism). Defaults to True.
+        mamba_ssm_ngroups (int, optional): Specifies the number of groups to use.
+            The default value is 8, as in the NVIDIA Mamba2 (pure and hybrid) 8b.
+            However, in the original Mamba2 paper, the checkpoints use a setting of 1.
+            Defaults to 8.
         post_process (bool, optional):
             Include an output layer (used with pipeline parallelism). Defaults to True.
         fp16_lm_cross_entropy (bool, optional):
@@ -58,17 +59,18 @@ class DragonModel(LanguageModule):
     def __init__(
         self,
         config: DragonConfig,
-        transformer_layer_spec: ModuleSpec,
+        dragon_layer_spec: ModuleSpec,
         vocab_size: int,
         max_sequence_length: int,
         pre_process: bool = True,
+        mamba_ssm_ngroups: int = 8, #What is that, how does this translate to Mamba architecture
         post_process: bool = True,
         fp16_lm_cross_entropy: bool = False,
         parallel_output: bool = True,
         share_embeddings_and_output_weights: bool = False,
-        position_embedding_type: Literal['learned_absolute', 'rope', 'none'] = 'learned_absolute',
-        rotary_percent: float = 1.0,
-        rotary_base: int = 10000,
+        position_embedding_type: Literal['learned_absolute', 'rope', 'none'] = 'rope',
+        rotary_percent: float = 1.0, #Check what should be the default value for our model config
+        rotary_base: int = 10000, #Check what should be the default value for our model config
         seq_len_interpolation_factor: Optional[float] = None,
     ) -> None:
         super().__init__(config=config)
@@ -76,9 +78,10 @@ class DragonModel(LanguageModule):
         if has_config_logger_enabled(config):
             log_config_to_disk(config, locals(), prefix=type(self).__name__)
 
-        self.transformer_layer_spec: ModuleSpec = transformer_layer_spec
+        self.dragon_layer_spec: ModuleSpec = dragon_layer_spec
         self.vocab_size = vocab_size
         self.max_sequence_length = max_sequence_length
+        self.mamba_ssm_ngroups = mamba_ssm_ngroups
         self.pre_process = pre_process
         self.post_process = post_process
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
@@ -113,30 +116,17 @@ class DragonModel(LanguageModule):
             )
 
         # Transformer.
-        self.decoder = TransformerBlock(
-            config=self.config,
-            spec=transformer_layer_spec,
+        self.decoder = build_module(
+            dragon_layer_spec,
+            self.config,
+            mamba_ssm_ngroups=self.mamba_ssm_ngroups,
             pre_process=self.pre_process,
             post_process=self.post_process,
+            dtype=config.params_dtype,
         )
 
         # Output
         if post_process:
-            if self.config.defer_embedding_wgrad_compute:
-                # The embedding activation buffer preserves a reference to the input activations
-                # of the final embedding projection layer GEMM. It will hold the activations for
-                # all the micro-batches of a global batch for the last pipeline stage. Once we are
-                # done with all the back props for all the microbatches for the last pipeline stage,
-                # it will be in the pipeline flush stage. During this pipeline flush we use the
-                # input activations stored in embedding activation buffer and gradient outputs
-                # stored in gradient buffer to calculate the weight gradients for the embedding
-                # final linear layer.
-                self.embedding_activation_buffer = []
-                self.grad_output_buffer = []
-            else:
-                self.embedding_activation_buffer = None
-                self.grad_output_buffer = None
-
             self.output_layer = tensor_parallel.ColumnParallelLinear(
                 config.hidden_size,
                 self.vocab_size,
@@ -147,9 +137,8 @@ class DragonModel(LanguageModule):
                 gather_output=not self.parallel_output,
                 skip_weight_param_allocation=self.pre_process
                 and self.share_embeddings_and_output_weights,
-                embedding_activation_buffer=self.embedding_activation_buffer,
-                grad_output_buffer=self.grad_output_buffer,
             )
+
 
         if self.pre_process or self.post_process:
             self.setup_embeddings_and_output_layer()
@@ -183,11 +172,9 @@ class DragonModel(LanguageModule):
         decoder_input: Tensor = None,
         labels: Tensor = None,
         inference_params: InferenceParams = None,
-        packed_seq_params: PackedSeqParams = None,
-        extra_block_kwargs: dict = None,
     ) -> Tensor:
-        """Forward function of the GPT Model This function passes the input tensors
-        through the embedding layer, and then the decoeder and finally into the post
+        """Forward function of the Dragon Model This function passes the input tensors
+        through the embedding layer, and then the decoder and finally into the post
         processing layer (optional).
 
         It either returns the Loss values if labels are given  or the final hidden units
@@ -219,8 +206,6 @@ class DragonModel(LanguageModule):
             attention_mask=attention_mask,
             inference_params=inference_params,
             rotary_pos_emb=rotary_pos_emb,
-            packed_seq_params=packed_seq_params,
-            **(extra_block_kwargs or {}),
         )
 
         if not self.post_process:
@@ -251,29 +236,3 @@ class DragonModel(LanguageModule):
         loss = self.compute_language_model_loss(labels, logits)
 
         return loss
-
-    def sharded_state_dict(
-        self, prefix: str = '', sharded_offsets: tuple = (), metadata: Optional[Dict] = None
-    ) -> ShardedStateDict:
-        """Sharded state dict implementation for GPTModel backward-compatibility
-        (removing extra state).
-
-        Args:
-            prefix (str): Module name prefix.
-            sharded_offsets (tuple): PP related offsets, expected to be empty at this module level.
-            metadata (Optional[Dict]): metadata controlling sharded state dict creation.
-
-        Returns:
-            ShardedStateDict: sharded state dict for the GPTModel
-        """
-        sharded_state_dict = super().sharded_state_dict(prefix, sharded_offsets, metadata)
-        output_layer_extra_state_key = f'{prefix}output_layer._extra_state'
-
-        # Old GPT checkpoints only stored the output layer weight key. So we remove the
-        # _extra_state key but check that it doesn't contain any data anyway
-        output_extra_state = sharded_state_dict.pop(output_layer_extra_state_key, None)
-        assert not (
-            output_extra_state and output_extra_state.data
-        ), f'Expected output layer extra state to be empty, got: {output_extra_state}'
-
-        return sharded_state_dict

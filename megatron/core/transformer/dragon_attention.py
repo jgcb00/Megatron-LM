@@ -216,6 +216,8 @@ class DragonAttention(MegatronModule, ABC):
         else:
             window_size = self.window_size
             
+        print(window_size)
+            
 
         if self.checkpoint_core_attention and self.training:
             core_attn_out = self._checkpointed_attention_forward(

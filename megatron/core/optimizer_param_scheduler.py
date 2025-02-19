@@ -108,7 +108,7 @@ class OptimizerParamScheduler:
         if self.slw_warmup_steps is not None:
             assert self.slw_warmup_steps < self.total_steps
         else:
-            self.slw_warmup_steps = 1
+            self.slw_warmup_steps = 0.001
         assert self.total_steps is not None
 
 
@@ -117,7 +117,7 @@ class OptimizerParamScheduler:
         log_single_rank(logger, logging.INFO, f"> learning rate decay style: {self.lr_decay_style}")
 
     def get_slw(self) -> float:
-        return min(self.num_steps/self.global_batch_size/self.total_steps, 1.0)
+        return min(self.num_steps/self.global_batch_size/self.slw_warmup_steps, 1.0)
 
 
     def get_beta3(self) -> float:
@@ -252,6 +252,7 @@ class OptimizerParamScheduler:
             'end_wd': self.end_wd,
             'wd_incr_style': self.wd_incr_style,
             'wd_incr_steps': self.wd_incr_steps,
+            'slw_warmup_steps': self.slw_warmup_steps,
         }
         return state_dict
 
@@ -341,4 +342,9 @@ class OptimizerParamScheduler:
             )
             self.wd_incr_style = self._check_and_set(
                 self.wd_incr_style, state_dict['wd_incr_style'], "weight decay incr style"
+            )
+
+        if 'slw_warmup_steps' in state_dict:
+            self.slw_warmup_steps = self._check_and_set(
+                self.slw_warmup_steps, state_dict['slw_warmup_steps'], "slw warmup steps"
             )

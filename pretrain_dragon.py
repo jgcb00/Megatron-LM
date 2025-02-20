@@ -58,13 +58,13 @@ def model_provider(pre_process=True, post_process=True) -> DragonModel:
     assert args.use_legacy_models == False, "Mamba only supported in Mcore!"
 
     if args.spec is not None:
-        samba_stack_spec = import_module(args.spec)
+        dragon_stack_spec = import_module(args.spec)
     else:
         raise ValueError("You must provide a valid Dragon layer spec!")
 
     model = DragonModel(
         config=config,
-        samba_stack_spec=samba_stack_spec,
+        dragon_stack_spec=dragon_stack_spec,
         vocab_size=args.padded_vocab_size,
         max_sequence_length=args.max_position_embeddings,
         pre_process=pre_process,

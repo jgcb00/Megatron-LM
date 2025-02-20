@@ -42,7 +42,7 @@ GPT_MODEL_ARGS=(
     --seq-length 4096 
     --max-position-embeddings 4096
     --seed 42
-    --spec megatron.core.models.dragon.dragon_layer_specs samba_stack_spec
+    --spec megatron.core.models.dragon.dragon_layer_specs dragon_stack_spec
     --normalization RMSNorm
     --group-query-attention
     --num-query-groups 8

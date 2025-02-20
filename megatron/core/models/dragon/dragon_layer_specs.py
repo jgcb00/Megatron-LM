@@ -62,7 +62,6 @@ dragon_stack_spec = ModuleSpec(
                     submodules=DragonSelfAttentionSubmodules(
                         linear_qkv=TEColumnParallelLinear,
                         core_attention=TEDotProductAttention,
-                        linear_proj=TERowParallelLinear,
                         # TENorm significantly harms convergence when used
                         # for QKLayerNorm; we instead use the Apex implementation.
                         q_layernorm=FusedLayerNorm,

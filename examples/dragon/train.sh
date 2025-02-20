@@ -16,14 +16,13 @@ TENSORBOARD_LOGS_PATH=$2 #<Specify path>
 VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
 DATA_PATH=$4 #<Specify path and file prefix>_text_document
 
-# Calculate the number of workers
-num_workers=$((GPUS_PER_NODE * 8))
-
 # Apply the maximum limit of 16
-if [ "$num_workers" -gt 16 ]; then
+if [ "$WORLD_SIZE" -gt 16 ]; then
   num_workers=16
+else
+  num_workers=$WORLD_SIZE
 fi
-
+    
 echo "Master Address : "$MASTER_ADDR" | "$NUM_NODES" Nodes | World Size : "$WORLD_SIZE
 
 DISTRIBUTED_ARGS=(

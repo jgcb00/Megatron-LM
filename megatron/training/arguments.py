@@ -679,7 +679,6 @@ def core_transformer_config_from_args(args, config_class=None):
         kw_args['bias_activation_fusion'] = args.bias_swiglu_fusion
     else:
         kw_args['bias_activation_fusion'] = args.bias_gelu_fusion
-        kw_args['activation_func'] = F.gelu
     if args.squared_relu:
         assert not args.swiglu
         kw_args['activation_func'] = squared_relu

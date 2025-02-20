@@ -70,10 +70,13 @@ class DragonConfig(ModelParallelConfig):
 
     add_qkv_bias: bool = False
     """Add a bias term only for QKV projections."""
+    
+    activation_func: Callable = F.gelu
+    """Activation function to use for the non-linearity in the MLP."""
 
     activation_func_fp8_input_store: bool = False
     """Store the input of MLP activation function in FP8 for backprop to save memory.
-    The stored input is casted back to the original precision before backprop compuatation."""
+    The stored input is casted back to the original precision before backprop computation."""
 
     num_moe_experts: int = None
     """Number of experts to use for MoE layer. When set, it replaces MLP with MoE layer. Set to None

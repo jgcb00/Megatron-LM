@@ -82,7 +82,7 @@ class BaseFragonLayer(ABC):
         pass
 
 
-class DragonLayer(MegatronModule, BaseTransformerLayer):
+class DragonLayer(MegatronModule):
     """A single transformer layer.
 
     Transformer layer takes input with size [s, b, h] and returns an

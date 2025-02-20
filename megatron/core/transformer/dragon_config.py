@@ -76,7 +76,10 @@ class DragonConfig(ModelParallelConfig):
 
     add_qkv_bias: bool = False
     """Add a bias term only for QKV projections."""
-    
+
+    gated_linear_unit: bool = False
+    """Use a gated linear unit for the first linear layer in the MLP."""
+        
     activation_func: Callable = F.gelu
     """Activation function to use for the non-linearity in the MLP."""
 

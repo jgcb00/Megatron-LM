@@ -168,7 +168,6 @@ class DragonLayer(MegatronModule):
         )
 
         # [Module 4: Post SelfAttention Norm]
-        print("Post SelfAttention Norm size : ", self.intermediate_size)
         self.self_attn_layernorm = build_module(
             submodules.self_attn_layernorm,
             config=self.config,
@@ -368,6 +367,7 @@ class DragonLayer(MegatronModule):
         )
         print("Attention Output: ", attention_output.shape)
         # Post attention layernorm.
+        print("Attention Output contig: ", attention_output.is_contiguous())
         attention_layer_norm = self.self_attn_layernorm(attention_output)
 
         mamba_output = self.mamba_mixer(input_layernorm_output, inference_params=inference_params)

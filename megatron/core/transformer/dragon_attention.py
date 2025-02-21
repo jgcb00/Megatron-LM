@@ -348,7 +348,7 @@ class DragonSelfAttention(DragonAttention):
         self.linear_qkv = build_module(
             submodules.linear_qkv,
             self.config.hidden_size,
-            self.query_projection_size + 2 * self.kv_projection_size if cache_sharing == CacheSharing.FIRST else self.query_projection_size,
+            2 * (self.query_projection_size + 2 * self.kv_projection_size) if cache_sharing == CacheSharing.FIRST else 2 * self.query_projection_size,
             config=self.config,
             init_method=self.config.init_method,
             gather_output=False,
@@ -546,9 +546,9 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         packed_seq_params=None,
     ):
         # hidden_states: [sq, b, h]
-        print("Hidden States: ", hidden_states.shape)
-        print("Key: ", key.shape if key is not None else None)
-        print("Value: ", value.shape if value is not None else None)
+        #print("Hidden States: ", hidden_states.shape)
+        #print("Key: ", key.shape if key is not None else None)
+        #print("Value: ", value.shape if value is not None else None)
 
         # For self attention we just duplicate the rotary_pos_emb if it isn't already
         if rotary_pos_emb is not None and not isinstance(rotary_pos_emb, tuple):
@@ -561,12 +561,12 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         # self or cross attn.
         if self.cache_sharing == CacheSharing.FIRST:
             query, key, value = self.get_query_key_value_tensors(hidden_states, key_value_states)
-            print("Query: ", query.shape)
-            print("Key: ", key.shape)
-            print("Value: ", value.shape)
+            #print("Query: ", query.shape)
+            #print("Key: ", key.shape)
+            #print("Value: ", value.shape)
         else:
             query, _ = self.linear_qkv(hidden_states)
-            print("Query: ", query.shape)    
+            #print("Query: ", query.shape)    
 
         # ===================================================
         # Adjust key, value, and rotary_pos_emb for inference
@@ -606,7 +606,7 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         # ==================================
         # diff attention reshaping
         # ==================================
-        print("num_query_groups_per_partition: ", self.num_query_groups_per_partition)
+        #print("num_query_groups_per_partition: ", self.num_query_groups_per_partition)
         
         query = query.reshape(
             query.shape[:-2] + (

@@ -647,7 +647,7 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         else:
             window_size = self.window_size
             
-        print("Windows size :", window_size)
+        print("Window size :", window_size)
             
         corr_attn_func = None
         if self.checkpoint_core_attention and self.training:
@@ -703,7 +703,7 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         lambda_1 = torch.exp(torch.sum(self.lambda_q1 * self.lambda_k1, dim=-1).float()).type_as(query)
         lambda_2 = torch.exp(torch.sum(self.lambda_q2 * self.lambda_k2, dim=-1).float()).type_as(query)
         lambda_full = lambda_1 - lambda_2 + self.lambda_init
-        core_attn_out = attn1 - lambda_full * attn2
+        core_attn_out = (attn1 - lambda_full * attn2).contiguous()  # Changed to contiguous()
         
 
         if packed_seq_params is not None:

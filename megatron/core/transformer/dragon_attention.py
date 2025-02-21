@@ -638,6 +638,8 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         # ==================================
         # core attention computation
         # ==================================
+        print("Optimiser Param Scheduler: ", OPTIMIZER_PARAM_SCHEDULER)
+        print("Fix Window Size: ", self.fix_window_size)
         if not self.fix_window_size and OPTIMIZER_PARAM_SCHEDULER is not None:
             slw = OPTIMIZER_PARAM_SCHEDULER.get_slw()
             if slw == 1.0:

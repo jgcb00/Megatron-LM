@@ -148,6 +148,7 @@ class DragonStack(MegatronModule):
                     cache_sharing = CacheSharing.FIRST
                 else:
                     cache_sharing = CacheSharing.SECOND
+            layer_percentage += 1 / self.config.num_layers
             layer = build_module(
                 submodules.dragon_layer,
                 config=self.config,

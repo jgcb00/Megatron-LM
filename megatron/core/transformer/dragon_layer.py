@@ -391,7 +391,7 @@ class DragonLayer(MegatronModule):
         
         
         # MLP.
-        mlp_output = self.mlp(residual)
+        mlp_output, _ = self.mlp(residual)
         
         output = mlp_output + residual
         

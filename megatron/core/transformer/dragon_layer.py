@@ -383,6 +383,7 @@ class DragonLayer(MegatronModule):
         average  = (attention_layer_norm + mamba_layer_norm) / 2
         
         output_proj_output = self.output_projection(average)
+        print("Output Projection: ", output_proj_output)
         
         residual = output_proj_output + residual
 

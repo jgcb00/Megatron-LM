@@ -365,9 +365,9 @@ class DragonLayer(MegatronModule):
             rotary_pos_emb=rotary_pos_emb,
             packed_seq_params=packed_seq_params,
         )
-        print("Attention Output: ", attention_output.shape)
+        # print("Attention Output: ", attention_output.shape)
         # Post attention layernorm.
-        print("Attention Output contig: ", attention_output.is_contiguous())
+        # print("Attention Output contig: ", attention_output.is_contiguous())
         attention_layer_norm = self.self_attn_layernorm(attention_output)
 
         mamba_output = self.mamba_mixer(
@@ -375,7 +375,7 @@ class DragonLayer(MegatronModule):
             attention_mask=attention_mask, #not used but required for compatibility
             inference_params=inference_params,
         )
-        print("Mamba Output: ", mamba_output.shape)
+        # print("Mamba Output: ", mamba_output.shape)
         # Post Mamba layernorm.
         mamba_layer_norm = self.mamba_layernorm(mamba_output)
         
@@ -383,11 +383,11 @@ class DragonLayer(MegatronModule):
         average  = (attention_layer_norm + mamba_layer_norm) / 2
         
         output_proj_output, _ = self.output_projection(average)
-        print("Output Projection: ", output_proj_output)
+        # print("Output Projection: ", output_proj_output)
         
         residual = output_proj_output + residual
 
-        print("Residual after output projection: ", residual.shape)
+        # print("Residual after output projection: ", residual.shape)
         
         
         # MLP.

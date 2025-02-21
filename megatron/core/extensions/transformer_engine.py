@@ -378,7 +378,7 @@ class TELayerNormMLP(te.pytorch.LayerNormMLP):
         init_method: Callable,
         bias: bool,
         skip_bias_add: bool,
-        activation = "squared_relu", # one of 'gelu', 'geglu', 'relu', 'reglu', 'squared_relu', 'swiglu', 'qgemu', 'srelu'
+        activation = "srelu", # one of 'gelu', 'geglu', 'relu', 'reglu', 'squared_relu', 'swiglu', 'qgemu', 'srelu'
         tp_comm_buffer_name: str = None,
         return_layernorm_output : bool = False,
     ):

@@ -173,7 +173,6 @@ class DragonStack(MegatronModule):
             )
 
         self.apply(partial(_init_weights, n_layer=self.config.num_layers))
-        exit()
 
     def _select_layers_for_pipeline_parallel(self):
         pipeline_rank = parallel_state.get_pipeline_model_parallel_rank()

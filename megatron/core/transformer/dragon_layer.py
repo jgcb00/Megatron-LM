@@ -120,11 +120,11 @@ class DragonLayer(MegatronModule):
         
     
         # [Module 2: InputProjection]
-        # intermediate_size = int(2 * self.config.hidden_size) # Mamba Expand
+        intermediate_size = int(2 * self.config.hidden_size) # Mamba Expand
         # attention_head_size = int(intermediate_size / self.config.num_attention_heads)
         
         #Save params for forward pass
-        # self.intermediate_size = intermediate_size
+        self.intermediate_size = intermediate_size
         # self.attention_head_size = attention_head_size
         # self.num_attention_heads = self.config.num_attention_heads
         # self.num_query_groups = self.config.num_query_groups

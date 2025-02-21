@@ -75,11 +75,11 @@ class DragonAttention(MegatronModule, ABC):
         # For normal attention without groups, num_query_groups == num_attention_heads,
         # so these two will be the same
         self.query_projection_size = self.config.kv_channels * self.config.num_attention_heads
-        self.kv_projection_size = self.config.kv_channels * self.config.num_query_groups
+        self.kv_projection_size =  self.config.kv_channels * self.config.num_query_groups
 
         # Per attention head and per partition values.
         world_size = parallel_state.get_tensor_model_parallel_world_size()
-        self.hidden_size_per_attention_head = divide(
+        self.hidden_size_per_attention_head = 2 * divide(
             self.query_projection_size, self.config.num_attention_heads
         )
         self.num_attention_heads_per_partition = divide(self.config.num_attention_heads, world_size)
@@ -348,7 +348,7 @@ class DragonSelfAttention(DragonAttention):
         self.linear_qkv = build_module(
             submodules.linear_qkv,
             self.config.hidden_size,
-            2 * (self.query_projection_size + 2 * self.kv_projection_size) if cache_sharing == CacheSharing.FIRST else 2 * self.query_projection_size,
+            2 * (self.query_projection_size + 2 * self.kv_projection_size if cache_sharing == CacheSharing.FIRST else self.query_projection_size),
             config=self.config,
             init_method=self.config.init_method,
             gather_output=False,

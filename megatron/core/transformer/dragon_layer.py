@@ -215,7 +215,7 @@ class DragonLayer(MegatronModule):
             input_size=self.config.hidden_size,
             hidden_size=4*self.config.hidden_size,
             bias=True,
-            skip_bias_add=True            
+            skip_bias_add=False            
         )
         if hasattr(self.mlp, 'set_layer_number'):
             self.mlp.set_layer_number(self.layer_number)
@@ -382,7 +382,7 @@ class DragonLayer(MegatronModule):
         # Output projection.
         average  = (attention_layer_norm + mamba_layer_norm) / 2
         
-        output_proj_output = self.output_projection(average)
+        output_proj_output, _ = self.output_projection(average)
         print("Output Projection: ", output_proj_output)
         
         residual = output_proj_output + residual

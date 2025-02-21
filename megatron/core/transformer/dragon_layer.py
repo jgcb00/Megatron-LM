@@ -208,7 +208,12 @@ class DragonLayer(MegatronModule):
         )
 
         # [Module 8: MLP block]
-        self.mlp = build_module(submodules.mlp, config=self.config)
+        self.mlp = build_module(
+            submodules.mlp, 
+            config=self.config,
+            input_size=self.config.hidden_size,
+            hidden_size=4*self.config.hidden_size,
+        )
         if hasattr(self.mlp, 'set_layer_number'):
             self.mlp.set_layer_number(self.layer_number)
 

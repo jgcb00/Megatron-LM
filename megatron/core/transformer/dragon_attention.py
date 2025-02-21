@@ -91,8 +91,8 @@ class DragonAttention(MegatronModule, ABC):
         # Modification for diff attention
         attention_config.num_attention_heads = self.config.num_attention_heads // 2
         attention_config.num_query_groups = self.config.num_query_groups // 2
-        attention_config.hidden_size = self.config.hidden_size
-        
+        attention_config.hidden_size = self.hidden_size_per_attention_head * attention_config.num_attention_heads
+        attention_config.kv_channels = self.config.kv_channels * 2 #For hymba
         
         self.core_attention = build_module(
             submodules.core_attention,

@@ -208,6 +208,7 @@ class DragonAttention(MegatronModule, ABC):
         # ==================================
         if not self.fix_window_size and OPTIMIZER_PARAM_SCHEDULER is not None:
             slw = OPTIMIZER_PARAM_SCHEDULER.get_slw()
+            print("slw: ", slw)
             if slw == 1.0:
                 self.fix_window_size = True
                 window_size  = self.window_size

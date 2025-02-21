@@ -200,7 +200,7 @@ class DragonLayer(MegatronModule):
             self.config.hidden_size,
             config=self.config,
             init_method=self.config.init_method,
-            gather_output=False,
+            #gather_output=False,
             layer_number=layer_number,
             bias=True,
             skip_bias_add=True,

@@ -370,7 +370,11 @@ class DragonLayer(MegatronModule):
         print("Attention Output contig: ", attention_output.is_contiguous())
         attention_layer_norm = self.self_attn_layernorm(attention_output)
 
-        mamba_output = self.mamba_mixer(input_layernorm_output, inference_params=inference_params)
+        mamba_output = self.mamba_mixer(
+            input_layernorm_output,
+            attention_mask=attention_mask, #not used but required for compatibility
+            inference_params=inference_params,
+        )
         print("Mamba Output: ", mamba_output.shape)
         # Post Mamba layernorm.
         mamba_layer_norm = self.mamba_layernorm(mamba_output)

@@ -141,6 +141,7 @@ class DragonStack(MegatronModule):
                 cache_sharing = CacheSharing.FIRST
                 window_size = (-1, 0)
             else:
+                print("local attention layer")
                 window_size = (2048, 0)
                 nb_full_attention_layer =  bisect.bisect(full_attention_threshold, layer_percentage+1/self.config.num_layers)
                 if (len(self.layers) + 1 + pp_layer_offset - nb_full_attention_layer) % 2 == 0:

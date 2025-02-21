@@ -606,7 +606,7 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         # ==================================
         # diff attention reshaping
         # ==================================
-        print("num_query_groups_per_partition: ", self.num_query_groups_per_partition)
+        #print("num_query_groups_per_partition: ", self.num_query_groups_per_partition)
         
         query = query.reshape(
             query.shape[:-2] + (

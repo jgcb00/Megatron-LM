@@ -168,6 +168,7 @@ class DragonLayer(MegatronModule):
         )
 
         # [Module 4: Post SelfAttention Norm]
+        print("Post SelfAttention Norm size : ", self.intermediate_size)
         self.self_attn_layernorm = build_module(
             submodules.self_attn_layernorm,
             config=self.config,

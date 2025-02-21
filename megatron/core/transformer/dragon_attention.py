@@ -647,6 +647,8 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         else:
             window_size = self.window_size
             
+        print("Windows size :", window_size)
+            
         corr_attn_func = None
         if self.checkpoint_core_attention and self.training:
             corr_attn_func = self._checkpointed_attention_forward

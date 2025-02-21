@@ -201,9 +201,11 @@ class DragonLayer(MegatronModule):
             config=self.config,
             init_method=self.config.init_method,
             #gather_output=False,
-            #bias=True,
+            bias=True,
             skip_bias_add=True,
             tp_comm_buffer_name='output_proj',
+            input_is_parallel=False,
+            is_expert=False,
         )
 
         # [Module 8: MLP block]

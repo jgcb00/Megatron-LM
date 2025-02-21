@@ -204,7 +204,6 @@ class DragonLayer(MegatronModule):
             #bias=True,
             skip_bias_add=True,
             tp_comm_buffer_name='output_proj',
-            return_layernorm_output=False,
         )
 
         # [Module 8: MLP block]

@@ -610,7 +610,7 @@ class DragonDiffSelfAttention(DragonSelfAttention):
         
         query = query.reshape(
             query.shape[:-2] + (
-                self.num_query_groups_per_partition // 2,
+                self.num_attention_heads_per_partition // 2,
                 2,
                 query.shape[-1],
             )

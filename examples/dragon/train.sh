@@ -71,7 +71,7 @@ TRAINING_ARGS=(
     --use-flash-attn
     #--use-distributed-optimizer
     --sequence-parallel
-
+    --slw_warmup_steps 1000
 )
 
 MODEL_PARALLEL_ARGS=(

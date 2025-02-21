@@ -179,8 +179,7 @@ class DragonLayer(MegatronModule):
         self.mamba_mixer = build_module(
             submodules.mamba,
             self.config,
-            d_model=self.config.hidden_size,
-            ngroups=mamba_ssm_ngroups,
+            mamba_ssm_ngroups=mamba_ssm_ngroups,
             layer_number=layer_number,
         )
         

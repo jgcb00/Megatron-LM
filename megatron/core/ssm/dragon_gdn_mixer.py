@@ -208,7 +208,9 @@ class DragonGDNMixer(MegatronModule):
             setattr(self.v_conv1d.bias, 'tensor_model_parallel', True)
 
             if self.conv_init is not None:
-                nn.init.uniform_(self.conv1d.weight, -self.conv_init, self.conv_init)
+                nn.init.uniform_(self.q_conv1d.weight, -self.conv_init, self.conv_init)
+                nn.init.uniform_(self.k_conv1d.weight, -self.conv_init, self.conv_init)
+                nn.init.uniform_(self.v_conv1d.weight, -self.conv_init, self.conv_init)
         
         #self.apply(self._initialize_weights)
         # original GDN used a xavier_uniform here for the nn.Linear weights
@@ -271,3 +273,6 @@ class DragonGDNMixer(MegatronModule):
         
         o = rearrange(o, 'b t h d -> t b (h d)').contiguous()
         return o
+    
+    # todo
+    #def sharded_state_dict(self, prefix='', sharded_offsets=(), metadata=None):

@@ -97,12 +97,35 @@ class DragonGDNMixer(MegatronModule):
 
         self.tensor_model_parallel_size = get_tensor_model_parallel_world_size()
 
-        # todo : build_module and submodules AND fuse the 5 projs...
-        self.q_proj = nn.Linear(d_model, self.key_dim, bias=False)
-        self.k_proj = nn.Linear(d_model, self.key_dim, bias=False)
-        self.v_proj = nn.Linear(d_model, self.value_dim, bias=False)
-        self.b_proj = nn.Linear(d_model, self.num_heads, bias=False)
-        self.a_proj = nn.Linear(d_model, self.num_heads, bias=False)
+        in_proj_dim = (
+            self.key_dim +  # q_proj
+            self.key_dim +  # k_proj
+            self.value_dim +  # v_proj
+            self.num_heads +  # b_proj
+            self.num_heads  # a_proj
+        )
+
+        self.q_slice = slice(0, self.key_dim)
+        self.k_slice = slice(self.key_dim, 2 * self.key_dim)
+        self.v_slice = slice(2 * self.key_dim, 2 * self.key_dim + self.value_dim)
+        self.b_slice = slice(
+            2 * self.key_dim + self.value_dim,
+            2 * self.key_dim + self.value_dim + self.num_heads,
+        )
+        self.a_slice = slice(
+            2 * self.key_dim + self.value_dim + self.num_heads,
+            2 * self.key_dim + self.value_dim + 2 * self.num_heads,
+        )
+
+        self.in_proj = build_module(
+            submodules.in_proj,
+            self.config,
+            d_model,
+            in_proj_dim,
+            bias=False,
+            skip_bias_add=False,
+            init_method=self.config.init_method,
+        )
 
         # hard coded for now todo
         dt_min = 0.001
@@ -181,16 +204,9 @@ class DragonGDNMixer(MegatronModule):
             if self.conv_init is not None:
                 nn.init.uniform_(self.conv1d.weight, -self.conv_init, self.conv_init)
         
-        self.apply(self._initialize_weights) # todo not sure this will work with a MegatronModule? + eventually the weights will not be nn.Linear
-
-    def _initialize_weights(self, module: MegatronModule):
-        if getattr(module, "_is_hf_initialized", False):
-            return
-        if isinstance(module, nn.Linear):
-            nn.init.xavier_uniform_(module.weight, gain=2 ** -2.5)
-            if module.bias is not None:
-                nn.init.zeros_(module.bias)
-        module._is_hf_initialized = True
+        #self.apply(self._initialize_weights)
+        # original GDN used a xavier_uniform here for the nn.Linear weights
+        # I disabled it because we instead use the self.config.init_method
 
     def forward(self, hidden_states):
         """
@@ -199,29 +215,38 @@ class DragonGDNMixer(MegatronModule):
         """
         _, batch, dim = hidden_states.shape
 
-        # transpose: l b pd --> b l pd
-        hidden_states = rearrange(hidden_states, "l b d -> b l d").contiguous()
+        qkvba, _ = self.in_proj(hidden_states)
 
-        q, _ = self.q_conv1d(x=self.q_proj(hidden_states),
-                                            mask=None, # for dealing with padded pos
-                                            cache=None, # for autoregressive decoding
-                                            output_final_state=False, # for autoregressive decoding
-                                            seq_idx=None) # for varlen
-        k, _ = self.k_conv1d(x=self.k_proj(hidden_states),
-                                            mask=None,
-                                            cache=None,
-                                            output_final_state=False,
-                                            seq_idx=None)
-        v, _ = self.v_conv1d(x=self.v_proj(hidden_states),
-                                            mask=None,
-                                            cache=None,
-                                            output_final_state=False,
-                                            seq_idx=None)
+        # transpose: l b pd --> b l pd
+        qkvba = rearrange(qkvba, "l b d -> b l d").contiguous()
+        
+        # split proj into q, k, v, b, a
+        q_proj = qkvba[:, :, self.q_slice]
+        k_proj = qkvba[:, :, self.k_slice]
+        v_proj = qkvba[:, :, self.v_slice]
+        b_proj = qkvba[:, :, self.b_slice]
+        a_proj = qkvba[:, :, self.a_slice]
+
+        q, _ = self.q_conv1d(x=q_proj,
+                             mask=None, 
+                             cache=None,
+                             output_final_state=False,
+                             seq_idx=None)
+        k, _ = self.k_conv1d(x=k_proj,
+                             mask=None,
+                             cache=None,
+                             output_final_state=False,
+                             seq_idx=None)
+        v, _ = self.v_conv1d(x=v_proj,
+                             mask=None,
+                             cache=None,
+                             output_final_state=False,
+                             seq_idx=None)
         
         q, k = map(lambda x: rearrange(x, 'b t (h d) -> b t h d', d=self.head_k_dim), (q, k))
         v = rearrange(v, 'b t (h d) -> b t h d', d=self.head_v_dim)
-        beta = self.b_proj(hidden_states).sigmoid()
-        g = -self.A_log.float().exp() * F.softplus(self.a_proj(hidden_states).float() + self.dt_bias)
+        beta = b_proj.sigmoid()
+        g = -self.A_log.float().exp() * F.softplus(a_proj.float() + self.dt_bias)
 
         o, _ = chunk_gated_delta_rule(
                 q=q,

@@ -16,6 +16,7 @@ TENSORBOARD_LOGS_PATH=$2 #<Specify path>
 VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
 DATA_PATH=$4 #<Specify path and file prefix>_text_document
 
+
 # Apply the maximum limit of 16
 if [ "$WORLD_SIZE" -gt 16 ]; then
   num_workers=16

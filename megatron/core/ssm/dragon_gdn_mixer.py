@@ -86,9 +86,9 @@ class DragonGDNMixer(MegatronModule):
         self.conv_init = conv_init
 
         self.head_dim = d_head
-        self.num_heads = d_model // d_head
+        self.n_heads = d_model // d_head
 
-        self.key_dim = self.num_heads * self.head_dim
+        self.key_dim = self.n_heads * self.head_dim
         self.value_dim = self.key_dim * self.expand_v
         self.head_k_dim = d_head
         self.head_v_dim = d_head * self.expand_v
@@ -97,12 +97,18 @@ class DragonGDNMixer(MegatronModule):
 
         self.tensor_model_parallel_size = get_tensor_model_parallel_world_size()
 
+        print("Tensor Model Parallel Size: ", self.tensor_model_parallel_size)
+
+        self.n_heads_local = self.n_heads // self.tensor_model_parallel_size
+
+        # TODO (TP) : key_dim, value_dim etc should be local!!
+
         in_proj_dim = (
             self.key_dim +  # q_proj
             self.key_dim +  # k_proj
             self.value_dim +  # v_proj
-            self.num_heads +  # b_proj
-            self.num_heads  # a_proj
+            self.n_heads +  # b_proj
+            self.n_heads  # a_proj
         )
 
         self.q_slice = slice(0, self.key_dim)
@@ -110,11 +116,11 @@ class DragonGDNMixer(MegatronModule):
         self.v_slice = slice(2 * self.key_dim, 2 * self.key_dim + self.value_dim)
         self.b_slice = slice(
             2 * self.key_dim + self.value_dim,
-            2 * self.key_dim + self.value_dim + self.num_heads,
+            2 * self.key_dim + self.value_dim + self.n_heads,
         )
         self.a_slice = slice(
-            2 * self.key_dim + self.value_dim + self.num_heads,
-            2 * self.key_dim + self.value_dim + 2 * self.num_heads,
+            2 * self.key_dim + self.value_dim + self.n_heads,
+            2 * self.key_dim + self.value_dim + 2 * self.n_heads,
         )
 
         self.in_proj = build_module(
@@ -137,7 +143,7 @@ class DragonGDNMixer(MegatronModule):
             # Initialize dt bias so that F.softplus(dt_bias) is between dt_min and dt_max
             dt = torch.exp(
                 torch.rand(
-                    self.nheads_local, device=torch.cuda.current_device(), dtype=config.params_dtype
+                    self.n_heads_local, device=torch.cuda.current_device(), dtype=config.params_dtype
                 )
                 * (math.log(dt_max) - math.log(dt_min))
                 + math.log(dt_min)
@@ -157,7 +163,7 @@ class DragonGDNMixer(MegatronModule):
 
             assert A_init_range[0] > 0 and A_init_range[1] >= A_init_range[0]
             A = torch.empty(
-                self.nheads_local, dtype=torch.float32, device=torch.cuda.current_device()
+                self.n_heads_local, dtype=torch.float32, device=torch.cuda.current_device()
             ).uniform_(*A_init_range)
             A_log = torch.log(A)  # Keep A_log in fp32
             self.A_log = nn.Parameter(A_log)
@@ -167,7 +173,7 @@ class DragonGDNMixer(MegatronModule):
         # D "skip" parameter
         self.D = nn.Parameter(
             torch.ones(
-                self.d_inner_local if self.D_has_hdim else self.nheads_local,
+                self.n_heads_local,
                 device=torch.cuda.current_device(),
             )
         )  # Keep in fp32

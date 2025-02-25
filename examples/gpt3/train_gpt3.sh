@@ -1,7 +1,5 @@
  #!/bin/bash
 
-# Runs the "175B" parameter model
-
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 GPUS_PER_NODE=4
@@ -27,32 +25,32 @@ DISTRIBUTED_ARGS=(
 )
 
 GPT_MODEL_ARGS=(
-    --num-layers 8 
-    --hidden-size 2048 
-    --num-attention-heads 8 
-    --seq-length 4096 
+    --num-layers 12
+    --hidden-size 728
+    --num-attention-heads 6
+    --seq-length 4096
     --max-position-embeddings 4096
     --seed 42
 )
 
 TRAINING_ARGS=(
-    --num-workers 16
+    --num-workers 1
     --micro-batch-size 4
-    --train-samples 12207050 
-    --weight-decay 0.1 
-    --adam-beta1 0.9 
-    --adam-beta2 0.95 
-    --init-method-std 0.006 
-    --clip-grad 1.0 
+    --train-samples 12207050
+    --weight-decay 0.1
+    --adam-beta1 0.9
+    --adam-beta2 0.95
+    --init-method-std 0.006
+    --clip-grad 1.0
     --bf16
-    --lr 1.0e-4 
-    --lr-decay-style cosine 
+    --lr 1.0e-4
+    --lr-decay-style cosine
     --min-lr 1.0e-5
-    --lr-warmup-fraction .001 
+    --lr-warmup-fraction .001
     #--lr-decay-iters 430000 
     #--use-flash-attn
     #--use-distributed-optimizer
-    --sequence-parallel
+    # --sequence-parallel
     #--overlap-param-gather 
     #--overlap-grad-reduce 
     --normalization RMSNorm

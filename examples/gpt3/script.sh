@@ -12,7 +12,7 @@
 
 
 bash Megatron-LM/examples/gpt3/train_gpt3_175b_distributed.sh \
-    model_1B_100BT \
+    ckpt/ \
     ./tensorboard/logs \
-    ../../prepared_data/experimental_tokenizer.json \
-    ../../prepared_data/zyda
+    .experimental_tokenizer.json \
+    ../../zyda_data/

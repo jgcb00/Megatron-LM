@@ -97,6 +97,7 @@ class DragonGDNMixer(MegatronModule):
 
         self.tensor_model_parallel_size = get_tensor_model_parallel_world_size()
 
+        print("------- DragonGDN mixer init ------")
         print("Tensor Model Parallel Size: ", self.tensor_model_parallel_size)
 
         self.n_heads_local = self.n_heads // self.tensor_model_parallel_size

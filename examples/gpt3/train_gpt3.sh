@@ -1,6 +1,5 @@
  #!/bin/bash
 
-export CUDA_DEVICE_MAX_CONNECTIONS=1 
 export CUDA_VISISBLE_DEVICES=0
 
 CHECKPOINT_PATH=$1 #<Specify path>
@@ -38,7 +37,6 @@ TRAINING_ARGS=(
     #--overlap-param-gather 
     #--overlap-grad-reduce 
     --normalization RMSNorm
-    --no-gradient-accumulation-fusion
 )
 
 MODEL_PARALLEL_ARGS=(

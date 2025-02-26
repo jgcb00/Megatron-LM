@@ -4,7 +4,7 @@
 
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 
-GPUS_PER_NODE=4
+GPUS_PER_NODE=1
 MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 MASTER_PORT=48994
 NUM_NODES=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | wc -l)

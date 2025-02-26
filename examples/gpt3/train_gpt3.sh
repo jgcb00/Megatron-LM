@@ -1,6 +1,6 @@
  #!/bin/bash
 
-export CUDA_VISISBLE_DEVICES=0
+export CUDA_DEVICE_MAX_CONNECTIONS=1
 
 CHECKPOINT_PATH=$1 #<Specify path>
 TENSORBOARD_LOGS_PATH=$2 #<Specify path>

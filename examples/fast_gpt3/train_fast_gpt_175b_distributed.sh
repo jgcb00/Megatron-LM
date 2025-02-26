@@ -36,10 +36,10 @@ DISTRIBUTED_ARGS=(
 )
 
 GPT_MODEL_ARGS=(
-    --num-layers 16 
-    --hidden-size 2048 
-    --num-attention-heads 8 
-    --seq-length 4096 
+    --num-layers 12
+    --hidden-size 768
+    --num-attention-heads 6
+    --seq-length 4096
     --max-position-embeddings 4096
     --normalization RMSNorm
     --seed 42
@@ -96,7 +96,7 @@ EVAL_AND_LOGGING_ARGS=(
     --log-throughput
 )
 
-srun torchrun ${DISTRIBUTED_ARGS[@]} ../../megatron_lb/pretrain_fastgpt.py \
+torchrun ${DISTRIBUTED_ARGS[@]} ../../megatron_lb/pretrain_fastgpt.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

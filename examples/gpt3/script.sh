@@ -11,8 +11,8 @@
 
 
 
-bash Megatron-LM/examples/gpt3/train_gpt3_175b_distributed.sh \
-    ckpt/ \
-    ./tensorboard/logs \
-    .experimental_tokenizer.json \
-    ../../zyda_data/
+bash examples/gpt3/train_gpt3.sh \
+    gpt3/ckpt/ \
+    tensorboard/logs \
+    experimental_tokenizer.json \
+    zyda_data/

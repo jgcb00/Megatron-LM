@@ -1,32 +1,16 @@
  #!/bin/bash
 
-export CUDA_DEVICE_MAX_CONNECTIONS=1
-
-GPUS_PER_NODE=4
-MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
-MASTER_PORT=48994
-NUM_NODES=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | wc -l)
-WORLD_SIZE=$(($GPUS_PER_NODE*$NUM_NODES))
-echo "Master Address : "$MASTER_ADDR" | "$NUM_NODES" Nodes | World Size : "$WORLD_SIZE
+export CUDA_DEVICE_MAX_CONNECTIONS=1 
+export CUDA_VISISBLE_DEVICES=0
 
 CHECKPOINT_PATH=$1 #<Specify path>
 TENSORBOARD_LOGS_PATH=$2 #<Specify path>
 VOCAB_FILE=$3 #<Specify path to file>/gpt2-vocab.json
 DATA_PATH=$4 #<Specify path and file prefix>_text_document
 
-DISTRIBUTED_ARGS=(
-    --nproc_per_node $GPUS_PER_NODE 
-    --nnodes $NUM_NODES 
-    --master_addr $MASTER_ADDR 
-    --master_port $MASTER_PORT
-    --rdzv_id $SLURM_JOB_ID
-    --rdzv_endpoint $MASTER_ADDR:29500
-    --rdzv_backend c10d
-)
-
 GPT_MODEL_ARGS=(
     --num-layers 12
-    --hidden-size 728
+    --hidden-size 768
     --num-attention-heads 6
     --seq-length 4096
     --max-position-embeddings 4096
@@ -54,6 +38,7 @@ TRAINING_ARGS=(
     #--overlap-param-gather 
     #--overlap-grad-reduce 
     --normalization RMSNorm
+    --no-gradient-accumulation-fusion
 )
 
 MODEL_PARALLEL_ARGS=(
@@ -84,7 +69,7 @@ EVAL_AND_LOGGING_ARGS=(
     --log-throughput
 )
 
-srun torchrun ${DISTRIBUTED_ARGS[@]} ../../Megatron-LM/pretrain_gpt.py \
+torchrun --standalone --nnodes=1 --nproc-per-node=1 pretrain_gpt.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \

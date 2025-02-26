@@ -10,3 +10,5 @@ logs
 local/
 .gitmodules
 *.bin
+env/
+env2/

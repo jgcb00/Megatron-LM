@@ -11,8 +11,8 @@ GPT_MODEL_ARGS=(
     --num-layers 12
     --hidden-size 768
     --num-attention-heads 6
-    --seq-length 4096
-    --max-position-embeddings 4096
+    --seq-length 1024
+    --max-position-embeddings 1024
     --seed 42
 )
 

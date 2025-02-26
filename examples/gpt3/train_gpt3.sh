@@ -67,7 +67,7 @@ EVAL_AND_LOGGING_ARGS=(
     --log-throughput
 )
 
-torchrun --standalone --nnodes=1 --nproc-per-node=1 pretrain_gpt.py \
+torchrun --standalone --nnodes=1 --nproc-per-node=1 ../../Megatron-LM/pretrain_gpt.py \
     ${GPT_MODEL_ARGS[@]} \
     ${TRAINING_ARGS[@]} \
     ${MODEL_PARALLEL_ARGS[@]} \
